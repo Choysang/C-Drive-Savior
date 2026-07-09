@@ -1,0 +1,5 @@
+__pycache__/
+*.pyc
+c-drive-scan-*.json
+c-drive-panel-*.html
+*.log
