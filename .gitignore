@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+sessions/
+benchmark-results/
 c-drive-scan-*.json
 c-drive-panel-*.html
 *.log
