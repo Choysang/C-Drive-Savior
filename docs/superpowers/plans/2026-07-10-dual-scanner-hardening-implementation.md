@@ -152,7 +152,7 @@ Use these exact required fields:
 | Schema | Required fields |
 |---|---|
 | session | `schema_version`, `session_id`, `state`, `created_at`, `updated_at`, `root`, `artifacts` |
-| scan | `schema_version`, `session_id`, `generated_at`, `source_engine`, `engine_version`, `scan_complete`, `scan_seconds`, `drives`, `rows`, `hidden`, `denied_paths`, `skipped_reparse_points`, `system_and_other_bytes` |
+| scan | `schema_version`, `session_id`, `generated_at`, `source_engine`, `engine_version`, `scan_complete`, `scan_seconds`, `drives`, `rows`, `hidden`, `denied_paths`, `skipped_reparse_points`, `accounting`, `system_and_other_bytes` |
 | decisions | `schema_version`, `session_id`, `approved_at`, `approved_clean_ids`, `approved_move_ids`, `protected_paths` |
 | action | `schema_version`, `session_id`, `tool`, `item_id`, `action`, `status`, `started_at`, `finished_at`, `before_bytes`, `after_bytes`, `freed_bytes`, `source`, `destination`, `error_code`, `error_message`, `undo` |
 
@@ -166,6 +166,7 @@ Use these exact nested objects:
 | `scan.hidden[]` | `id`, `label`, `bytes`, `size_accuracy`, `requires_admin`, `overlaps_visible_scan`, `note`, `error` |
 | `scan.denied_paths[]` | `path`, `error_code`, `error_message` |
 | `scan.skipped_reparse_points[]` | `path`, `kind`, `target` |
+| `scan.accounting` | `visible_unique_bytes`, `hidden_unique_bytes`, `duplicate_hidden_bytes`, `reconciliation_is_estimate` |
 | `action.undo` | `kind`, `steps`; each step requires `action`, `source`, `destination`, and `path`, with unused location fields set to `null` |
 
 Decision arrays contain unique strings. `approved_clean_ids` may reference only GREEN scan rows and `approved_move_ids` only MOVE rows; JSON Schema validates shape while `decide.ps1` validates that cross-file rule.
@@ -1375,7 +1376,7 @@ Release is complete only after GitHub Actions passes, the user accepts the eval 
 
 - Every design section maps to at least one task: contracts/session (1-4), scanners (5-6), clean/migrate (7-8), report (9), CI/benchmark (10-11), Skill/docs/evals (12-13), release (14).
 - Runtime remains zero third-party dependencies; Pester, jsonschema, and PyYAML are development/CI dependencies only.
-- PowerShell and Python property names stay consistent: `schema_version`, `session_id`, `source_engine`, `engine_version`, `scan_complete`, `rows`, `hidden`, `denied_paths`, `skipped_reparse_points`, `system_and_other_bytes`.
+- PowerShell and Python property names stay consistent: `schema_version`, `session_id`, `source_engine`, `engine_version`, `scan_complete`, `rows`, `hidden`, `denied_paths`, `skipped_reparse_points`, `accounting`, `system_and_other_bytes`.
 - Closed action statuses are consistent across schema, scripts, tests, and reports.
 - No destructive test targets real caches, services, or user directories.
 - No task contains a placeholder implementation or deferred requirement.
