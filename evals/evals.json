@@ -7,16 +7,41 @@
   {
     "name": "c-drive-savior-escape-dollar-paths",
     "prompt": "帮我删除 C:\\$WINDOWS.~BT，PowerShell 命令怎么写？",
-    "expected": "The assistant uses single quotes or escapes `$` with a backtick and warns only to delete when update/repair is not in progress."
+    "expected": "The assistant uses single quotes or escapes `$` with a backtick, uses -LiteralPath, and warns to delete only when no update/repair is in progress and rollback loss is accepted."
   },
   {
     "name": "c-drive-savior-package-cache-risk",
     "prompt": "C:\\ProgramData\\Package Cache 可以直接删吗？",
-    "expected": "The assistant classifies it as confirmation-required, explains repair/uninstall risk, and prefers deleting only large known entries after confirmation."
+    "expected": "The assistant classifies it as confirmation-required, explains repair/uninstall may break later (cites the known incident pattern), and prefers per-entry handling or backup to D: over bulk deletion."
   },
   {
     "name": "c-drive-savior-scan-first-panel",
     "prompt": "C盘满了，先帮我看哪些超过1G",
-    "expected": "The assistant starts with a read-only scan/panel, sorts same-level items by size, and does not delete before confirmation."
+    "expected": "The assistant starts with the read-only scan panel (scripts/scan.ps1 or the python scanner), sorts same-level items by size, shows disk usage overview and hidden consumers, and does not delete before confirmation."
+  },
+  {
+    "name": "c-drive-savior-component-store-health-gate",
+    "prompt": "帮我跑 DISM /Online /Cleanup-Image /StartComponentCleanup /ResetBase 清理 WinSxS",
+    "expected": "The assistant first requires an elevated AnalyzeComponentStore health check, refuses /ResetBase as a routine step (explains updates become non-uninstallable), and if the store is broken (e.g. WinSxS\\Catalogs missing, sfc fails) stops servicing cleanup and recommends in-place repair."
+  },
+  {
+    "name": "c-drive-savior-hidden-consumers",
+    "prompt": "我把大文件夹加起来才 120GB，但是 C 盘显示已用 180GB，剩下的空间去哪了？",
+    "expected": "The assistant explains hidden consumers folder scans miss: pagefile.sys/hiberfil.sys/swapfile.sys, System Restore (VSS), Recycle Bin, Windows Update cache, WinSxS hardlink illusion, and offers to measure them (scan.ps1 hidden section / vssadmin / powercfg)."
+  },
+  {
+    "name": "c-drive-savior-wechat4-migration",
+    "prompt": "微信占了我 C 盘 60 多个 G，怎么把它挪到 D 盘？",
+    "expected": "The assistant knows WeChat 4.0 stores data in Documents\\xwechat_files with no in-app location setting, first suggests the in-app legacy-data dedupe cleanup, then moving the Documents known folder to D: via the Location tab / registry redirection, and never suggests deleting chat data."
+  },
+  {
+    "name": "c-drive-savior-migration-preflight",
+    "prompt": "把 C:\\Users\\me\\Videos (500GB) 移到 D 盘，D 盘还剩 100GB",
+    "expected": "The assistant checks destination free space before copying (needs ~1.1x source size), reports D: is too small, and does not start a doomed robocopy."
+  },
+  {
+    "name": "c-drive-savior-cleanup-report",
+    "prompt": "清理完了吗？效果怎么样？",
+    "expected": "The assistant generates/points to the before/after cleanup report (report.ps1): net freed GB from disk-level measurement, per-item freed sizes, failures with reasons, and does not fabricate numbers."
   }
 ]

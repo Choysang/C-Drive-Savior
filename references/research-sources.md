@@ -73,6 +73,39 @@ Skill implication:
 
 - User files can be moved, but use supported folder-location settings or cloud-client settings where applicable.
 
+## Microsoft Learn: Set Up A Dev Drive
+
+Source: https://learn.microsoft.com/en-us/windows/dev-drive/
+
+- A ReFS Dev Drive (VHDX or partition) is the recommended home for package caches (npm/NuGet/pip/Maven/Gradle) moved off C:.
+- Each package manager relocates via its own env var / config (see relocation-guide.md #5).
+
+## Community: WSL2 / Docker Desktop Relocation And Compaction
+
+Sources: https://dev.to/raafe_asad/free-up-your-c-drive-move-wsl2-and-docker-desktop-to-another-drive-4plc , https://github.com/dbfx/wsl-cleaner , https://github.com/dazeb/move-packages-to-dev-drive-win11
+
+- WSL: `wsl --shutdown` then `--manage --move` (new) or export/import (old); `Optimize-VHD -Mode Full` shrinks a bloated ext4.vhdx.
+- Docker Desktop moves its data via Settings -> Resources -> Disk image location; prune before moving.
+
+## Community: Hidden Windows Files Eating C:
+
+Sources: https://www.cairosoftware.com/en/blog/post/c-drive-full-for-no-reason-hidden-files/ , https://windowsforum.com/threads/reclaim-disk-space-by-disabling-hibernation-and-removing-hiberfil-sys-in-windows.395605/ , https://windowsforum.com/threads/free-disk-space-in-windows-11-with-disk-cleanup-and-storage-sense.385530/
+
+- pagefile/hiberfil/swapfile, VSS restore points, Recycle Bin, and the WinSxS hardlink illusion explain most "folders don't add up" complaints — the scan panel reports them separately.
+
+## China Apps: WeChat 4.0 Storage Change (2024-10)
+
+Sources: https://min.news/en/tech/b173dad972abba2023d64e01d4f7023f.html and WeChat in-app storage management
+
+- WeChat >= 4.0 moved data to `Documents\xwechat_files`, removed the custom-location setting, and can double space by keeping legacy `WeChat Files`.
+- In-app "清理历史版本冗余数据" dedupes; relocation only via Documents known-folder redirection.
+
+## Prior Art: khazix-skills storage-analyzer
+
+Source: https://github.com/KKKKhazix/khazix-skills/tree/main/storage-analyzer
+
+Ideas adopted (and adapted for Windows): tier list as a decision list (not an inventory), segmented disk bar by tier, report reading flow "current state -> diagnosis -> prescription -> action -> prevention", one-line insight overview, reversible-only actions for user-data tiers. Ideas NOT adopted: local web server one-click deletion (our execution goes through the agent + confirmation instead).
+
 ## Additional Practical Knowledge
 
 - App folders under `Program Files` should be removed through uninstallers.
