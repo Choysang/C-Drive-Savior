@@ -187,6 +187,9 @@ function Assert-CdsApprovedItem {
         throw "Session is not approved for execution: $($session.state)"
     }
     $decisions = Read-CdsJson -Path $session.artifacts.decisions
+    if ($decisions.session_id -ne $SessionId) {
+        throw 'Decision session ID does not match the requested session.'
+    }
     $approvedIds = if ($Action -eq 'clean') { @($decisions.approved_clean_ids) } else { @($decisions.approved_move_ids) }
     if ($approvedIds -notcontains $ItemId) {
         throw "Item is not approved for ${Action}: $ItemId"
