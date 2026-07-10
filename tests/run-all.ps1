@@ -13,7 +13,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Python tests failed with exit code $LASTEXITCODE."
 }
 
-Get-ChildItem (Join-Path $PSScriptRoot '..\scripts\*.ps1') | ForEach-Object {
+Get-ChildItem (Join-Path $PSScriptRoot '..\scripts\*.ps1'),(Join-Path $PSScriptRoot '..\benchmarks\*.ps1') | ForEach-Object {
     $tokens = $null
     $errors = $null
     [Management.Automation.Language.Parser]::ParseFile(
