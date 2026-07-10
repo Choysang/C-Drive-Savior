@@ -197,9 +197,22 @@ function Assert-CdsApprovedItem {
     if ($TargetPath) {
         $target = [IO.Path]::GetFullPath($TargetPath)
         foreach ($protected in @($decisions.protected_paths)) {
-            if (Test-CdsPathWithin -Path $target -AllowedRoot $protected) {
+            if ((Test-CdsPathWithin -Path $target -AllowedRoot $protected) -or
+                (Test-CdsPathWithin -Path $protected -AllowedRoot $target)) {
                 throw "Target is nested under a protected path: $protected"
             }
+        }
+        $scan = Read-CdsJson -Path $session.artifacts.scan
+        if ($scan.session_id -ne $SessionId) {
+            throw 'Scan session ID does not match the requested session.'
+        }
+        $matchingRows = @($scan.rows | Where-Object { $_.id -eq $ItemId })
+        if ($matchingRows.Count -ne 1) {
+            throw "Approved item does not have exactly one scan baseline: $ItemId"
+        }
+        $baseline = [IO.Path]::GetFullPath([string]$matchingRows[0].path)
+        if (-not (Test-CdsPathWithin -Path $target -AllowedRoot $baseline)) {
+            throw "Target is outside the approved scan baseline: $baseline"
         }
     }
     return $true

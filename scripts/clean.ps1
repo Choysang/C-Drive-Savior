@@ -1,184 +1,384 @@
-﻿# clean.ps1 - C Drive Savior tier-1 (GREEN) cache cleaner. PowerShell 5.1 / 7.
-# Default is DRY-RUN (measures, deletes nothing). Add -Execute to actually clean.
-# Writes a JSON action log that report.ps1 consumes.
-# ASCII-only source on purpose (survives any PS host encoding).
-[CmdletBinding()]
+# clean.ps1 - session-gated GREEN cleanup for C Drive Savior.
+[CmdletBinding(DefaultParameterSetName='DryRun')]
 param(
-    [switch]$Execute,                 # without this: dry-run
-    [string[]]$Include,               # only these item ids
-    [string[]]$Exclude,               # skip these item ids
-    [switch]$SkipProcessCheck,        # clean even if owning processes run (not recommended)
+    [Parameter(ParameterSetName='Execute', Mandatory=$true)][switch]$Execute,
+    [Parameter(ParameterSetName='Execute', Mandatory=$true)][string]$SessionId,
+    [string[]]$Include,
+    [string[]]$Exclude,
+    [switch]$SkipProcessCheck,
+    [string]$SessionRoot = "$env:USERPROFILE\c-drive-savior\sessions",
     [string]$LogDir = "$env:USERPROFILE\c-drive-savior"
 )
 
-$ErrorActionPreference = 'SilentlyContinue'
+$ErrorActionPreference = 'Stop'
+$skillRoot = Split-Path $PSScriptRoot -Parent
+Import-Module (Join-Path $skillRoot 'modules\CDriveSavior.Core.psm1') -Force
+$classification = Read-CdsJson -Path (Join-Path $skillRoot 'config\classification.json')
 
-function Test-Elevated {
-    $id = [Security.Principal.WindowsIdentity]::GetCurrent()
-    (New-Object Security.Principal.WindowsPrincipal $id).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-}
-function Format-GB([long]$b) { [math]::Round($b / 1GB, 2) }
-function Get-TreeBytes([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return [long]0 }
-    [long]$t = 0
-    Get-ChildItem -LiteralPath $Path -Recurse -Force -ErrorAction SilentlyContinue |
-        ForEach-Object { if (-not $_.PSIsContainer -and -not ($_.Attributes -band [IO.FileAttributes]::ReparsePoint)) { $t += $_.Length } }
-    return $t
-}
-function Expand-Glob([string]$Pattern) {
-    # supports * segments (e.g. Chrome profiles). Returns existing literal paths.
-    if ($Pattern -notlike '*[*]*') { if (Test-Path -LiteralPath $Pattern) { return @($Pattern) } else { return @() } }
-    $out = @()
-    Resolve-Path -Path $Pattern -ErrorAction SilentlyContinue | ForEach-Object { $out += $_.Path }
-    return $out
+function Get-CatalogRoot([string]$Name) {
+    switch ($Name) {
+        'localappdata' { return [IO.Path]::GetFullPath($env:LOCALAPPDATA) }
+        'profile'      { return [IO.Path]::GetFullPath($env:USERPROFILE) }
+        'systemroot'   { return [IO.Path]::GetFullPath($env:SystemRoot) }
+        'programdata'  { return [IO.Path]::GetFullPath($env:ProgramData) }
+        default        { throw "Unknown catalog root: $Name" }
+    }
 }
 
-function Resolve-CatalogPath([string]$Resolver) {
-    if ($Resolver -eq 'delivery-optimization' -or $Resolver -eq 'recycle-bin') { return $null }
-
+function Resolve-CatalogSpec([string]$Resolver) {
+    if ($Resolver -in @('delivery-optimization', 'recycle-bin')) {
+        return [pscustomobject]@{ Pattern=$null; AllowedRoot=$null; Special=$Resolver }
+    }
     $parts = $Resolver.Split(':', 2)
-    if ($parts.Count -ne 2) { return $null }
-    $root = switch ($parts[0]) {
-        'temp'         { $env:TEMP }
-        'localappdata' { $env:LOCALAPPDATA }
-        'profile'      { $env:USERPROFILE }
-        'systemroot'   { $env:SystemRoot }
-        'programdata'  { $env:ProgramData }
-        default        { $null }
+    if ($parts.Count -ne 2) { throw "Invalid catalog resolver: $Resolver" }
+    if ($parts[0] -eq 'temp') {
+        return [pscustomobject]@{
+            Pattern=[IO.Path]::GetFullPath($env:TEMP)
+            AllowedRoot=(Get-CatalogRoot 'localappdata')
+            Special=$null
+        }
     }
-    if (-not $root) { return $null }
-    if (-not $parts[1]) { return $root }
-    return Join-Path $root ($parts[1].Replace('/', [IO.Path]::DirectorySeparatorChar))
+    $root = Get-CatalogRoot $parts[0]
+    $pattern = if ($parts[1]) {
+        Join-Path $root ($parts[1].Replace('/', [IO.Path]::DirectorySeparatorChar))
+    } else { $root }
+    return [pscustomobject]@{ Pattern=$pattern; AllowedRoot=$root; Special=$null }
 }
 
-# --- catalog -----------------------------------------------------------------
-$LOCAL = $env:LOCALAPPDATA
-$SkillRoot = Split-Path $PSScriptRoot -Parent
-$ClassificationPath = Join-Path $SkillRoot 'config\classification.json'
-$Classification = Get-Content -Raw -LiteralPath $ClassificationPath | ConvertFrom-Json
-$Catalog = @($Classification.cleanup_items | ForEach-Object {
-    $paths = @($_.resolvers | ForEach-Object { Resolve-CatalogPath $_ } | Where-Object { $_ })
-    [pscustomobject]@{
-        id = $_.id
-        admin = [bool]$_.admin
-        procs = @($_.owner_processes)
-        label = $_.label
-        paths = $paths
+function Expand-CatalogSpec($Spec) {
+    if ($Spec.Special) { return @() }
+    [void](Resolve-CdsSafePath -Path $Spec.Pattern -AllowedRoot $Spec.AllowedRoot)
+    if ($Spec.Pattern -like '*[*]*') {
+        return @(Resolve-Path -Path $Spec.Pattern -ErrorAction SilentlyContinue | ForEach-Object {
+            Resolve-CdsSafePath -Path $_.Path -AllowedRoot $Spec.AllowedRoot
+        })
     }
-})
-# NOT in catalog by design: WinSxS/DISM (health gate, pitfalls.md #6), Package Cache /
-# Windows Installer (YELLOW), $WINDOWS.~BT (rollback consent), whole browser profiles.
+    return @([IO.Path]::GetFullPath($Spec.Pattern))
+}
 
-$elevated = Test-Elevated
-$mode = 'dry-run'; if ($Execute) { $mode = 'execute' }
-New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
-$cBefore = (Get-PSDrive C).Free
-
-Write-Host ''
-Write-Host ("=== C Drive Savior clean ({0}) elevated={1} ===" -f $mode, $elevated)
-if (-not $Execute) { Write-Host '[i] DRY-RUN: measuring only. Re-run with -Execute to clean.' }
-
-$results = New-Object System.Collections.Generic.List[object]
-foreach ($item in $Catalog) {
-    if ($Include -and ($Include -notcontains $item.id)) { continue }
-    if ($Exclude -and ($Exclude -contains $item.id))   { continue }
-
-    $entry = [ordered]@{
-        id = $item.id; label = $item.label; action = 'clean'
-        freed_bytes = [long]0; status = ''; detail = ''
-        timestamp = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss')
+function Assert-NoReparseDescendant([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        throw [InvalidOperationException]::new("reparse point found: $Path")
     }
-
-    if ($item.admin -and -not $elevated) {
-        $entry.status = 'skipped-needs-admin'
-        $results.Add([pscustomobject]$entry); continue
-    }
-    $running = @()
-    foreach ($p in $item.procs) { if (Get-Process -Name $p -ErrorAction SilentlyContinue) { $running += $p } }
-    if ($running.Count -gt 0 -and -not $SkipProcessCheck -and $Execute) {
-        $entry.status = 'skipped-process-running'; $entry.detail = ($running -join ',')
-        $results.Add([pscustomobject]$entry)
-        Write-Host ("  SKIP {0,-18} process running: {1}" -f $item.id, $entry.detail)
-        continue
-    }
-
-    # measure
-    $paths = @()
-    foreach ($p in $item.paths) { $paths += Expand-Glob $p }
-    [long]$before = 0
-    foreach ($p in $paths) { $before += Get-TreeBytes $p }
-    if ($item.id -eq 'recyclebin') { $before = Get-TreeBytes "$env:SystemDrive\`$Recycle.Bin" }
-
-    if (-not $Execute) {
-        $entry.status = 'dry-run'; $entry.freed_bytes = $before
-        if ($running.Count -gt 0) { $entry.detail = ('process running: {0}' -f ($running -join ',')) }
-        $results.Add([pscustomobject]$entry)
-        Write-Host ("  PLAN {0,-18} {1,9} GB  {2} {3}" -f $item.id, (Format-GB $before), $item.label, $entry.detail)
-        continue
-    }
-
-    # execute
-    switch ($item.id) {
-        'wu-cache' {
-            Stop-Service wuauserv, bits -Force -ErrorAction SilentlyContinue
-            foreach ($p in $paths) { Get-ChildItem -LiteralPath $p -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
-            Start-Service wuauserv, bits -ErrorAction SilentlyContinue
+    if (-not $item.PSIsContainer) { return }
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($Path)
+    while ($stack.Count -gt 0) {
+        $current = $stack.Pop()
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries($current)) {
+            $attributes = [IO.File]::GetAttributes($entry)
+            if ($attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw [InvalidOperationException]::new("reparse point found: $entry")
+            }
+            if ($attributes -band [IO.FileAttributes]::Directory) { $stack.Push($entry) }
         }
-        'delivery-opt' {
-            if (Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue) { Delete-DeliveryOptimizationCache -Force -ErrorAction SilentlyContinue }
+    }
+}
+
+function Get-SafeTreeBytes([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path)) { return [long]0 }
+    Assert-NoReparseDescendant -Path $Path
+    $item = Get-Item -LiteralPath $Path -Force
+    if (-not $item.PSIsContainer) { return [long]$item.Length }
+    [long]$total = 0
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($Path)
+    while ($stack.Count -gt 0) {
+        $current = $stack.Pop()
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries($current)) {
+            $attributes = [IO.File]::GetAttributes($entry)
+            if ($attributes -band [IO.FileAttributes]::Directory) { $stack.Push($entry) }
+            else { $total += (New-Object IO.FileInfo $entry).Length }
         }
-        'recyclebin' { Clear-RecycleBin -Force -ErrorAction SilentlyContinue }
-        'thumbcache' {
-            Get-ChildItem -LiteralPath "$LOCAL\Microsoft\Windows\Explorer" -Filter 'thumbcache_*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-            Get-ChildItem -LiteralPath "$LOCAL\Microsoft\Windows\Explorer" -Filter 'iconcache_*' -Force -ErrorAction SilentlyContinue | Remove-Item -Force -ErrorAction SilentlyContinue
-        }
-        'memdump' { Remove-Item -LiteralPath "$env:SystemRoot\MEMORY.DMP" -Force -ErrorAction SilentlyContinue }
-        default {
-            foreach ($p in $paths) {
-                if (Test-Path -LiteralPath $p -PathType Leaf) { Remove-Item -LiteralPath $p -Force -ErrorAction SilentlyContinue }
-                else { Get-ChildItem -LiteralPath $p -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue }
+    }
+    return $total
+}
+
+function Clear-SafeTarget([string]$Path, [string]$AllowedRoot, [System.Collections.Generic.List[string]]$Errors) {
+    [void](Resolve-CdsSafePath -Path $Path -AllowedRoot $AllowedRoot)
+    Assert-NoReparseDescendant -Path $Path
+    if (-not (Test-Path -LiteralPath $Path)) { return }
+    $item = Get-Item -LiteralPath $Path -Force
+    if (-not $item.PSIsContainer) {
+        try { Remove-Item -LiteralPath $Path -Force -ErrorAction Stop }
+        catch { $Errors.Add($_.Exception.Message) }
+        return
+    }
+
+    $directories = New-Object System.Collections.Generic.List[string]
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($Path)
+    while ($stack.Count -gt 0) {
+        $current = $stack.Pop()
+        foreach ($entry in [IO.Directory]::EnumerateFileSystemEntries($current)) {
+            $attributes = [IO.File]::GetAttributes($entry)
+            if ($attributes -band [IO.FileAttributes]::ReparsePoint) {
+                throw [InvalidOperationException]::new("reparse point found: $entry")
+            }
+            if ($attributes -band [IO.FileAttributes]::Directory) {
+                $directories.Add($entry)
+                $stack.Push($entry)
+            } else {
+                try { Remove-Item -LiteralPath $entry -Force -ErrorAction Stop }
+                catch { $Errors.Add($_.Exception.Message) }
             }
         }
     }
-
-    [long]$after = 0
-    foreach ($p in $paths) { $after += Get-TreeBytes $p }
-    if ($item.id -eq 'recyclebin') { $after = Get-TreeBytes "$env:SystemDrive\`$Recycle.Bin" }
-    $freed = $before - $after; if ($freed -lt 0) { $freed = [long]0 }
-    $entry.freed_bytes = $freed
-    $entry.status = 'cleaned'
-    if ($after -gt 1MB) { $entry.status = 'partial'; $entry.detail = ('{0:N2} GB locked/remaining' -f (Format-GB $after)) }
-    $results.Add([pscustomobject]$entry)
-    Write-Host ("  {0,-7} {1,-18} freed {2,9} GB  {3}" -f $entry.status.ToUpper(), $item.id, (Format-GB $freed), $entry.detail)
+    foreach ($directory in @($directories | Sort-Object { $_.Length } -Descending)) {
+        try { Remove-Item -LiteralPath $directory -Force -ErrorAction Stop }
+        catch { $Errors.Add($_.Exception.Message) }
+    }
 }
 
-$cAfter = (Get-PSDrive C).Free
-$totalFreed = ($results | Where-Object { $_.status -in 'cleaned','partial' } | Measure-Object -Property freed_bytes -Sum).Sum
-if (-not $totalFreed) { $totalFreed = [long]0 }
-$planned = ($results | Where-Object status -eq 'dry-run' | Measure-Object -Property freed_bytes -Sum).Sum
-if (-not $planned) { $planned = [long]0 }
+function New-ActionRecord($Item, [string]$CurrentSessionId) {
+    $now = (Get-Date).ToUniversalTime().ToString('o')
+    return [pscustomobject][ordered]@{
+        schema_version=2; session_id=$CurrentSessionId; tool='clean.ps1'; item_id=$Item.id
+        action='clean'; status='planned'; started_at=$now; finished_at=$null
+        before_bytes=$null; after_bytes=$null; freed_bytes=$null
+        source=$null; destination=$null; error_code=$null; error_message=$null
+        undo=[pscustomobject][ordered]@{ kind='none'; steps=@() }
+    }
+}
 
-Write-Host ''
+function Complete-Action($Action, [string]$Status, $Before, $After, [string[]]$Errors) {
+    $Action.status = $Status
+    $Action.before_bytes = $Before
+    $Action.after_bytes = $After
+    if ($null -ne $Before -and $null -ne $After) {
+        $freed = [long]$Before - [long]$After
+        $Action.freed_bytes = if ($freed -gt 0) { [long]$freed } else { [long]0 }
+    } else { $Action.freed_bytes = $null }
+    $Action.finished_at = (Get-Date).ToUniversalTime().ToString('o')
+    if ($Errors.Count -gt 0) {
+        $Action.error_code = 'cleanup-error'
+        $Action.error_message = ($Errors -join ' | ')
+    }
+    return $Action
+}
+
+function Get-ItemTargets($Item) {
+    $targets = New-Object System.Collections.Generic.List[object]
+    foreach ($resolver in @($Item.resolvers)) {
+        $spec = Resolve-CatalogSpec $resolver
+        if ($spec.Special) {
+            if ($spec.Special -eq 'recycle-bin') {
+                $driveRoot = [IO.Path]::GetPathRoot("$env:SystemDrive\")
+                $targets.Add([pscustomobject]@{
+                    Path=(Join-Path $driveRoot '$Recycle.Bin')
+                    AllowedRoot=$driveRoot
+                    Special=$spec.Special
+                })
+            } else {
+                $targets.Add([pscustomobject]@{ Path=$null; AllowedRoot=$null; Special=$spec.Special })
+            }
+            continue
+        }
+        if ($Item.id -eq 'thumbcache') {
+            [void](Resolve-CdsSafePath -Path $spec.Pattern -AllowedRoot $spec.AllowedRoot)
+            foreach ($filter in @('thumbcache_*', 'iconcache_*')) {
+                Get-ChildItem -LiteralPath $spec.Pattern -Filter $filter -File -Force -ErrorAction SilentlyContinue |
+                    ForEach-Object { $targets.Add([pscustomobject]@{ Path=$_.FullName; AllowedRoot=$spec.AllowedRoot; Special=$null }) }
+            }
+            continue
+        }
+        foreach ($path in @(Expand-CatalogSpec $spec)) {
+            $targets.Add([pscustomobject]@{ Path=$path; AllowedRoot=$spec.AllowedRoot; Special=$null })
+        }
+    }
+    return @($targets | ForEach-Object { $_ })
+}
+
+function Invoke-WindowsUpdateCleanup($Targets, [System.Collections.Generic.List[string]]$Errors, [ref]$RestorationFailed) {
+    $RestorationFailed.Value = $false
+    $states = @{}
+    foreach ($name in @('wuauserv','bits')) {
+        try {
+            $service = Get-Service -Name $name -ErrorAction Stop
+            $serviceConfig = Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $name) -ErrorAction Stop
+            $states[$name] = [pscustomobject]@{
+                WasRunning=($service.Status -eq 'Running')
+                Status=[string]$service.Status
+                StartType=[string]$serviceConfig.StartMode
+            }
+            if ($states[$name].WasRunning) { Stop-Service -Name $name -Force -ErrorAction Stop }
+        } catch { $Errors.Add("$name stop/state: $($_.Exception.Message)") }
+    }
+    try {
+        if ($Errors.Count -eq 0) {
+            foreach ($target in $Targets) { Clear-SafeTarget -Path $target.Path -AllowedRoot $target.AllowedRoot -Errors $Errors }
+        }
+    } finally {
+        foreach ($name in @('wuauserv','bits')) {
+            if ($states.ContainsKey($name) -and $states[$name].WasRunning) {
+                try { Start-Service -Name $name -ErrorAction Stop }
+                catch {
+                    $RestorationFailed.Value = $true
+                    $Errors.Add("$name restore: $($_.Exception.Message)")
+                }
+            }
+            if ($states.ContainsKey($name)) {
+                try {
+                    $currentConfig = Get-CimInstance Win32_Service -Filter ("Name='{0}'" -f $name) -ErrorAction Stop
+                    if ([string]$currentConfig.StartMode -ne $states[$name].StartType) {
+                        $RestorationFailed.Value = $true
+                        $Errors.Add("$name start type changed from $($states[$name].StartType) to $($currentConfig.StartMode)")
+                    }
+                } catch {
+                    $RestorationFailed.Value = $true
+                    $Errors.Add("$name start type verification: $($_.Exception.Message)")
+                }
+            }
+        }
+    }
+}
+
+$selected = @($classification.cleanup_items | Where-Object {
+    (-not $Include -or $Include -contains $_.id) -and (-not $Exclude -or $Exclude -notcontains $_.id)
+})
+$results = New-Object System.Collections.Generic.List[object]
+$session = $null
+$sessionWasExecuting = $false
+
 if ($Execute) {
-    Write-Host ("TOTAL freed (per-item measured): {0} GB" -f (Format-GB $totalFreed))
-    Write-Host ("C: free {0} GB -> {1} GB (disk-level delta {2} GB)" -f (Format-GB $cBefore), (Format-GB $cAfter), (Format-GB ($cAfter - $cBefore)))
-} else {
-    Write-Host ("PLANNED reclaim if executed: ~{0} GB across {1} items" -f (Format-GB $planned), (@($results | Where-Object status -eq 'dry-run').Count))
-}
-$skippedAdmin = @($results | Where-Object status -eq 'skipped-needs-admin')
-if ($skippedAdmin.Count -gt 0) {
-    Write-Host ("[i] {0} admin items skipped. Run them elevated:" -f $skippedAdmin.Count)
-    Write-Host ("    Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy','Bypass','-File','{0}','-Execute','-Include','{1}'" -f $PSCommandPath, (($skippedAdmin | ForEach-Object { $_.id }) -join ','))
+    $session = Get-CdsSession -SessionId $SessionId -SessionRoot $SessionRoot
+    if ($session.state -eq 'approved') {
+        $session = Set-CdsSessionState -Session $session -NextState 'executing'
+        Write-CdsJsonAtomic -Path (Join-Path $session.root 'session.json') -InputObject $session
+        $sessionWasExecuting = $true
+    } elseif ($session.state -eq 'executing') { $sessionWasExecuting = $true }
 }
 
-$stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
-$log = [pscustomobject]@{
-    schema = 1; tool = 'clean.ps1'; mode = $mode
-    started = (Get-Date -Format 'yyyy-MM-ddTHH:mm:ss'); elevated = $elevated
-    c_free_before_gb = Format-GB $cBefore; c_free_after_gb = Format-GB $cAfter
-    total_freed_bytes = [long]$totalFreed; planned_bytes = [long]$planned
-    items = $results
+try {
+    foreach ($item in $selected) {
+        if (-not $Execute) {
+            $targets = @(Get-ItemTargets $item)
+            [long]$planned = 0
+            foreach ($target in @($targets | Where-Object Path)) {
+                $safe = Resolve-CdsSafePath -Path $target.Path -AllowedRoot $target.AllowedRoot
+                $planned += Get-SafeTreeBytes $safe
+            }
+            $results.Add([pscustomobject]@{ item_id=$item.id; status='planned'; before_bytes=$planned })
+            continue
+        }
+
+        $action = New-ActionRecord -Item $item -CurrentSessionId $SessionId
+        $errors = New-Object System.Collections.Generic.List[string]
+        try {
+            Assert-CdsApprovedItem -SessionId $SessionId -ItemId $item.id -Action clean -SessionRoot $SessionRoot | Out-Null
+        } catch {
+            $errors.Add($_.Exception.Message)
+            $action = Complete-Action $action 'skipped' $null $null $errors
+            Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+            $results.Add($action)
+            throw
+        }
+
+        if ($item.admin -and -not (Test-CdsElevated)) {
+            $errors.Add('Administrator privileges are required.')
+            $action = Complete-Action $action 'skipped' $null $null $errors
+            Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+            $results.Add($action); continue
+        }
+        $running = @($item.owner_processes | Where-Object { Get-Process -Name $_ -ErrorAction SilentlyContinue })
+        if ($running.Count -gt 0 -and -not $SkipProcessCheck) {
+            $errors.Add('Owning process is running: ' + ($running -join ','))
+            $action = Complete-Action $action 'skipped' $null $null $errors
+            Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+            $results.Add($action); continue
+        }
+
+        try {
+            $targets = @(Get-ItemTargets $item)
+            $normalTargets = @($targets | Where-Object Path)
+            foreach ($target in $normalTargets) {
+                $target.Path = Resolve-CdsSafePath -Path $target.Path -AllowedRoot $target.AllowedRoot
+                Assert-CdsApprovedItem -SessionId $SessionId -ItemId $item.id -Action clean `
+                    -SessionRoot $SessionRoot -TargetPath $target.Path | Out-Null
+            }
+        } catch {
+            $errors.Add($_.Exception.Message)
+            $action = Complete-Action $action 'skipped' $null $null $errors
+            Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+            $results.Add($action)
+            throw
+        }
+        $action.source = if ($normalTargets.Count -gt 0) { $normalTargets[0].Path } else { [string]$targets[0].Special }
+
+        $existing = @($normalTargets | Where-Object { Test-Path -LiteralPath $_.Path })
+        if ($normalTargets.Count -gt 0 -and $existing.Count -eq 0) {
+            $action = Complete-Action $action 'not-found' ([long]0) ([long]0) $errors
+            Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+            $results.Add($action); continue
+        }
+
+        try {
+            foreach ($target in $existing) { Assert-NoReparseDescendant -Path $target.Path }
+        } catch {
+            if ($_.Exception.Message -like 'reparse point found:*') {
+                $errors.Add($_.Exception.Message)
+                $action = Complete-Action $action 'skipped' $null $null $errors
+                Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+                $results.Add($action); continue
+            }
+            throw
+        }
+
+        $unmeasuredSpecial = $item.id -eq 'delivery-opt'
+        $before = if ($unmeasuredSpecial) { $null } else { [long]0 }
+        if (-not $unmeasuredSpecial) {
+            foreach ($target in $existing) { $before = [long]$before + (Get-SafeTreeBytes $target.Path) }
+        }
+        try {
+            $serviceRestorationFailed = $false
+            switch ($item.id) {
+                'wu-cache' { Invoke-WindowsUpdateCleanup -Targets $existing -Errors $errors -RestorationFailed ([ref]$serviceRestorationFailed) }
+                'delivery-opt' {
+                    $command = Get-Command Delete-DeliveryOptimizationCache -ErrorAction SilentlyContinue
+                    if ($command) { Delete-DeliveryOptimizationCache -Force -ErrorAction Stop }
+                    else { $errors.Add('Delivery Optimization cleanup command is unavailable.') }
+                }
+                'recyclebin' { Clear-RecycleBin -Force -ErrorAction Stop }
+                default {
+                    foreach ($target in $existing) {
+                        $target.Path = Resolve-CdsSafePath -Path $target.Path -AllowedRoot $target.AllowedRoot
+                        Assert-NoReparseDescendant -Path $target.Path
+                        Clear-SafeTarget -Path $target.Path -AllowedRoot $target.AllowedRoot -Errors $errors
+                    }
+                }
+            }
+        } catch { $errors.Add($_.Exception.Message) }
+
+        $after = if ($unmeasuredSpecial) { $null } else { [long]0 }
+        if (-not $unmeasuredSpecial) {
+            foreach ($target in $existing) {
+                try { $after = [long]$after + (Get-SafeTreeBytes $target.Path) }
+                catch { $errors.Add($_.Exception.Message) }
+            }
+        }
+        $freed = if ($null -ne $before -and $null -ne $after) { [long]($before - $after) } else { $null }
+        $status = if ($serviceRestorationFailed) { 'failed' }
+            elseif ($errors.Count -eq 0 -and ($null -eq $after -or $after -eq 0)) { 'completed' }
+            elseif ($null -ne $freed -and $freed -gt 0) { 'partial' }
+            else { 'failed' }
+        $action = Complete-Action $action $status $before $after $errors
+        Write-CdsAction -SessionId $SessionId -SessionRoot $SessionRoot -ActionRecord $action
+        $results.Add($action)
+        if ($serviceRestorationFailed) {
+            throw "Service restoration failed: $($action.error_message)"
+        }
+    }
+} finally {
+    if ($Execute -and $sessionWasExecuting) {
+        $latest = Get-CdsSession -SessionId $SessionId -SessionRoot $SessionRoot
+        if ($latest.state -eq 'executing') {
+            $latest = Set-CdsSessionState -Session $latest -NextState 'approved'
+            Write-CdsJsonAtomic -Path (Join-Path $latest.root 'session.json') -InputObject $latest
+        }
+    }
 }
-$logPath = Join-Path $LogDir ("actions-clean-{0}-{1}.json" -f $mode, $stamp)
-[IO.File]::WriteAllText($logPath, ($log | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $true))
-Write-Host ("log: {0}" -f $logPath)
+
+Write-Host ("C Drive Savior clean: {0} item(s), execute={1}" -f $results.Count, [bool]$Execute)
+return @($results | ForEach-Object { $_ })
