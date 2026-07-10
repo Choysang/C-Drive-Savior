@@ -1,0 +1,318 @@
+{
+  "schema_version": 1,
+  "protected_prefixes": [
+    "windows/system32",
+    "windows/syswow64",
+    "windows/winsxs",
+    "windows/installer",
+    "windows/systemapps",
+    "windows/servicing",
+    "program files/windowsapps",
+    "program files",
+    "program files (x86)"
+  ],
+  "green_names": [
+    "npm-cache",
+    "pnpm-cache",
+    "pip",
+    "pypa",
+    "uv",
+    "yarn",
+    "node-gyp",
+    "ms-playwright",
+    "puppeteer",
+    "go-build",
+    "d3dscache",
+    "crashdumps",
+    "squirreltemp",
+    "temp",
+    "tmp",
+    "fontconfig",
+    "cef",
+    "chrome-devtools-mcp",
+    "tauri",
+    "ipch",
+    "code cache",
+    "gpucache",
+    "service worker",
+    "cache",
+    "cache2",
+    "cachestorage",
+    "shadercache",
+    "optimization_guide_model_store",
+    "cmaketools",
+    "obsidian-updater",
+    "updfsetup",
+    "winsparkle"
+  ],
+  "yellow_names": [
+    "package cache",
+    "recovery",
+    "customizations",
+    "$windows.~bt",
+    "$winreagent",
+    "scoop",
+    ".git",
+    "windows.old",
+    ".gradle",
+    ".m2",
+    ".nuget",
+    ".cargo",
+    "packages"
+  ],
+  "move_names": [
+    "downloads",
+    "desktop",
+    "documents",
+    "pictures",
+    "videos",
+    "music",
+    "onedrive",
+    "steamlibrary",
+    "wsl"
+  ],
+  "special_cases": [
+    {
+      "names": [
+        "xwechat_files",
+        "wechat files"
+      ],
+      "tier": "YELLOW",
+      "note": "WeChat data (chat history/files). In-app dedupe cleanup; move via Documents redirection. Never delete."
+    }
+  ],
+  "cleanup_items": [
+    {
+      "id": "temp-user",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "User temp (%TEMP%)",
+      "owner_processes": [],
+      "resolvers": ["temp:"]
+    },
+    {
+      "id": "crashdumps",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "App crash dumps",
+      "owner_processes": [],
+      "resolvers": ["localappdata:CrashDumps"]
+    },
+    {
+      "id": "dxcache",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "DirectX shader cache",
+      "owner_processes": [],
+      "resolvers": ["localappdata:D3DSCache"]
+    },
+    {
+      "id": "thumbcache",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Explorer thumbnail cache",
+      "owner_processes": [],
+      "resolvers": ["localappdata:Microsoft/Windows/Explorer"]
+    },
+    {
+      "id": "chrome-cache",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Chrome caches",
+      "owner_processes": ["chrome"],
+      "resolvers": [
+        "localappdata:Google/Chrome/User Data/*/Cache",
+        "localappdata:Google/Chrome/User Data/*/Code Cache",
+        "localappdata:Google/Chrome/User Data/*/GPUCache",
+        "localappdata:Google/Chrome/User Data/optimization_guide_model_store",
+        "localappdata:Google/Chrome/User Data/*/Service Worker/CacheStorage"
+      ]
+    },
+    {
+      "id": "edge-cache",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Edge caches",
+      "owner_processes": ["msedge"],
+      "resolvers": [
+        "localappdata:Microsoft/Edge/User Data/*/Cache",
+        "localappdata:Microsoft/Edge/User Data/*/Code Cache",
+        "localappdata:Microsoft/Edge/User Data/*/GPUCache"
+      ]
+    },
+    {
+      "id": "firefox-cache",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Firefox cache2",
+      "owner_processes": ["firefox"],
+      "resolvers": ["localappdata:Mozilla/Firefox/Profiles/*/cache2"]
+    },
+    {
+      "id": "npm",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "npm cache",
+      "owner_processes": ["node"],
+      "resolvers": ["localappdata:npm-cache"]
+    },
+    {
+      "id": "pnpm",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "pnpm cache",
+      "owner_processes": ["node"],
+      "resolvers": ["localappdata:pnpm-cache"]
+    },
+    {
+      "id": "yarn",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Yarn cache",
+      "owner_processes": ["node"],
+      "resolvers": ["localappdata:Yarn/Cache"]
+    },
+    {
+      "id": "pip",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "pip cache",
+      "owner_processes": [],
+      "resolvers": ["localappdata:pip/Cache"]
+    },
+    {
+      "id": "uv",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "uv cache",
+      "owner_processes": [],
+      "resolvers": ["localappdata:uv"]
+    },
+    {
+      "id": "playwright",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Playwright browsers",
+      "owner_processes": ["chrome", "msedge"],
+      "resolvers": ["localappdata:ms-playwright"]
+    },
+    {
+      "id": "puppeteer",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Puppeteer browsers",
+      "owner_processes": [],
+      "resolvers": [
+        "localappdata:puppeteer",
+        "profile:.cache/puppeteer"
+      ]
+    },
+    {
+      "id": "node-gyp",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "node-gyp headers",
+      "owner_processes": [],
+      "resolvers": ["localappdata:node-gyp"]
+    },
+    {
+      "id": "go-build",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Go build cache",
+      "owner_processes": [],
+      "resolvers": ["localappdata:go-build"]
+    },
+    {
+      "id": "nuget",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "NuGet package cache",
+      "owner_processes": [],
+      "resolvers": ["profile:.nuget/packages"]
+    },
+    {
+      "id": "gradle",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Gradle caches",
+      "owner_processes": ["java"],
+      "resolvers": ["profile:.gradle/caches"]
+    },
+    {
+      "id": "squirrel",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Squirrel updater temp",
+      "owner_processes": [],
+      "resolvers": ["localappdata:SquirrelTemp"]
+    },
+    {
+      "id": "wer-user",
+      "tier": "GREEN",
+      "admin": false,
+      "label": "Error reports (user)",
+      "owner_processes": [],
+      "resolvers": ["localappdata:Microsoft/Windows/WER"]
+    },
+    {
+      "id": "temp-windows",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Windows temp",
+      "owner_processes": [],
+      "resolvers": ["systemroot:Temp"]
+    },
+    {
+      "id": "wu-cache",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Windows Update download cache",
+      "owner_processes": [],
+      "resolvers": ["systemroot:SoftwareDistribution/Download"]
+    },
+    {
+      "id": "delivery-opt",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Delivery Optimization cache",
+      "owner_processes": [],
+      "resolvers": ["delivery-optimization"]
+    },
+    {
+      "id": "minidump",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Kernel minidumps",
+      "owner_processes": [],
+      "resolvers": ["systemroot:Minidump"]
+    },
+    {
+      "id": "memdump",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "MEMORY.DMP",
+      "owner_processes": [],
+      "resolvers": ["systemroot:MEMORY.DMP"]
+    },
+    {
+      "id": "wer-system",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Error reports (system)",
+      "owner_processes": [],
+      "resolvers": [
+        "programdata:Microsoft/Windows/WER/ReportQueue",
+        "programdata:Microsoft/Windows/WER/ReportArchive"
+      ]
+    },
+    {
+      "id": "recyclebin",
+      "tier": "GREEN",
+      "admin": true,
+      "label": "Recycle Bin",
+      "owner_processes": [],
+      "resolvers": ["recycle-bin"]
+    }
+  ]
+}

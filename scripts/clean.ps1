@@ -33,43 +33,39 @@ function Expand-Glob([string]$Pattern) {
     return $out
 }
 
+function Resolve-CatalogPath([string]$Resolver) {
+    if ($Resolver -eq 'delivery-optimization' -or $Resolver -eq 'recycle-bin') { return $null }
+
+    $parts = $Resolver.Split(':', 2)
+    if ($parts.Count -ne 2) { return $null }
+    $root = switch ($parts[0]) {
+        'temp'         { $env:TEMP }
+        'localappdata' { $env:LOCALAPPDATA }
+        'profile'      { $env:USERPROFILE }
+        'systemroot'   { $env:SystemRoot }
+        'programdata'  { $env:ProgramData }
+        default        { $null }
+    }
+    if (-not $root) { return $null }
+    if (-not $parts[1]) { return $root }
+    return Join-Path $root ($parts[1].Replace('/', [IO.Path]::DirectorySeparatorChar))
+}
+
 # --- catalog -----------------------------------------------------------------
 $LOCAL = $env:LOCALAPPDATA
-$Catalog = @(
-    @{id='temp-user';    admin=$false; procs=@();                    label='User temp (%TEMP%)';                 paths=@("$env:TEMP")}
-    @{id='crashdumps';   admin=$false; procs=@();                    label='App crash dumps';                    paths=@("$LOCAL\CrashDumps")}
-    @{id='dxcache';      admin=$false; procs=@();                    label='DirectX shader cache';               paths=@("$LOCAL\D3DSCache")}
-    @{id='thumbcache';   admin=$false; procs=@();                    label='Explorer thumbnail cache';           paths=@("$LOCAL\Microsoft\Windows\Explorer")}
-    @{id='chrome-cache'; admin=$false; procs=@('chrome');            label='Chrome caches';                      paths=@(
-        "$LOCAL\Google\Chrome\User Data\*\Cache", "$LOCAL\Google\Chrome\User Data\*\Code Cache",
-        "$LOCAL\Google\Chrome\User Data\*\GPUCache", "$LOCAL\Google\Chrome\User Data\optimization_guide_model_store",
-        "$LOCAL\Google\Chrome\User Data\*\Service Worker\CacheStorage")}
-    @{id='edge-cache';   admin=$false; procs=@('msedge');            label='Edge caches';                        paths=@(
-        "$LOCAL\Microsoft\Edge\User Data\*\Cache", "$LOCAL\Microsoft\Edge\User Data\*\Code Cache",
-        "$LOCAL\Microsoft\Edge\User Data\*\GPUCache")}
-    @{id='firefox-cache';admin=$false; procs=@('firefox');           label='Firefox cache2';                     paths=@("$LOCAL\Mozilla\Firefox\Profiles\*\cache2")}
-    @{id='npm';          admin=$false; procs=@('node');              label='npm cache';                          paths=@("$LOCAL\npm-cache")}
-    @{id='pnpm';         admin=$false; procs=@('node');              label='pnpm cache';                         paths=@("$LOCAL\pnpm-cache")}
-    @{id='yarn';         admin=$false; procs=@('node');              label='Yarn cache';                         paths=@("$LOCAL\Yarn\Cache")}
-    @{id='pip';          admin=$false; procs=@();                    label='pip cache';                          paths=@("$LOCAL\pip\Cache")}
-    @{id='uv';           admin=$false; procs=@();                    label='uv cache';                           paths=@("$LOCAL\uv")}
-    @{id='playwright';   admin=$false; procs=@('chrome','msedge');   label='Playwright browsers';                paths=@("$LOCAL\ms-playwright")}
-    @{id='puppeteer';    admin=$false; procs=@();                    label='Puppeteer browsers';                 paths=@("$LOCAL\puppeteer", "$env:USERPROFILE\.cache\puppeteer")}
-    @{id='node-gyp';     admin=$false; procs=@();                    label='node-gyp headers';                   paths=@("$LOCAL\node-gyp")}
-    @{id='go-build';     admin=$false; procs=@();                    label='Go build cache';                     paths=@("$LOCAL\go-build")}
-    @{id='nuget';        admin=$false; procs=@();                    label='NuGet package cache';                paths=@("$env:USERPROFILE\.nuget\packages")}
-    @{id='gradle';       admin=$false; procs=@('java');              label='Gradle caches';                      paths=@("$env:USERPROFILE\.gradle\caches")}
-    @{id='squirrel';     admin=$false; procs=@();                    label='Squirrel updater temp';              paths=@("$LOCAL\SquirrelTemp")}
-    @{id='wer-user';     admin=$false; procs=@();                    label='Error reports (user)';               paths=@("$LOCAL\Microsoft\Windows\WER")}
-    # ---- admin items ----
-    @{id='temp-windows'; admin=$true;  procs=@();                    label='Windows temp';                       paths=@("$env:SystemRoot\Temp")}
-    @{id='wu-cache';     admin=$true;  procs=@();                    label='Windows Update download cache';      paths=@("$env:SystemRoot\SoftwareDistribution\Download")}
-    @{id='delivery-opt'; admin=$true;  procs=@();                    label='Delivery Optimization cache';        paths=@()}
-    @{id='minidump';     admin=$true;  procs=@();                    label='Kernel minidumps';                   paths=@("$env:SystemRoot\Minidump")}
-    @{id='memdump';      admin=$true;  procs=@();                    label='MEMORY.DMP';                         paths=@("$env:SystemRoot\MEMORY.DMP")}
-    @{id='wer-system';   admin=$true;  procs=@();                    label='Error reports (system)';             paths=@("$env:ProgramData\Microsoft\Windows\WER\ReportQueue", "$env:ProgramData\Microsoft\Windows\WER\ReportArchive")}
-    @{id='recyclebin';   admin=$true;  procs=@();                    label='Recycle Bin';                        paths=@()}
-)
+$SkillRoot = Split-Path $PSScriptRoot -Parent
+$ClassificationPath = Join-Path $SkillRoot 'config\classification.json'
+$Classification = Get-Content -Raw -LiteralPath $ClassificationPath | ConvertFrom-Json
+$Catalog = @($Classification.cleanup_items | ForEach-Object {
+    $paths = @($_.resolvers | ForEach-Object { Resolve-CatalogPath $_ } | Where-Object { $_ })
+    [pscustomobject]@{
+        id = $_.id
+        admin = [bool]$_.admin
+        procs = @($_.owner_processes)
+        label = $_.label
+        paths = $paths
+    }
+})
 # NOT in catalog by design: WinSxS/DISM (health gate, pitfalls.md #6), Package Cache /
 # Windows Installer (YELLOW), $WINDOWS.~BT (rollback consent), whole browser profiles.
 

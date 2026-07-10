@@ -25,21 +25,19 @@ function Test-Elevated {
 function Format-GB([long]$Bytes) { [math]::Round($Bytes / 1GB, 2) }
 
 # --- classification ---------------------------------------------------------
-$RedPrefixes = @(
-    'c:\windows\system32', 'c:\windows\syswow64', 'c:\windows\winsxs',
-    'c:\windows\installer', 'c:\windows\systemapps', 'c:\windows\servicing',
-    'c:\program files\windowsapps', 'c:\program files', 'c:\program files (x86)'
-)
+$SkillRoot = Split-Path $PSScriptRoot -Parent
+$ClassificationPath = Join-Path $SkillRoot 'config\classification.json'
+$Classification = Get-Content -Raw -LiteralPath $ClassificationPath | ConvertFrom-Json
+$RedPrefixes = @($Classification.protected_prefixes | ForEach-Object {
+    (Join-Path $env:SystemDrive ($_.Replace('/', [IO.Path]::DirectorySeparatorChar))).ToLowerInvariant()
+})
 $GreenNames = @{}
-foreach ($n in @('npm-cache','pnpm-cache','pip','pypa','uv','yarn','node-gyp','ms-playwright','puppeteer',
-        'go-build','d3dscache','crashdumps','squirreltemp','temp','tmp','fontconfig','cef','ipch',
-        'code cache','gpucache','service worker','cache','cache2','cachestorage','shadercache',
-        'optimization_guide_model_store','cmaketools','obsidian-updater','winsparkle')) { $GreenNames[$n] = $true }
+foreach ($n in $Classification.green_names) { $GreenNames[$n] = $true }
 $YellowNames = @{}
-foreach ($n in @('package cache','recovery','customizations','$windows.~bt','$winreagent','scoop','.git',
-        'xwechat_files','wechat files','windows.old','.gradle','.m2','.nuget','.cargo','packages')) { $YellowNames[$n] = $true }
+foreach ($n in $Classification.yellow_names) { $YellowNames[$n] = $true }
 $MoveNames = @{}
-foreach ($n in @('downloads','desktop','documents','pictures','videos','music','onedrive','steamlibrary','wsl')) { $MoveNames[$n] = $true }
+foreach ($n in $Classification.move_names) { $MoveNames[$n] = $true }
+$SpecialCases = @($Classification.special_cases)
 
 function Get-Tier([string]$Path) {
     $lower = $Path.ToLowerInvariant()
@@ -47,8 +45,8 @@ function Get-Tier([string]$Path) {
     foreach ($p in $RedPrefixes) {
         if ($lower.StartsWith($p)) { return @('RED', 'System/install area. Official tools or uninstaller only; never hand-delete.') }
     }
-    if ($name -eq 'xwechat_files' -or $name -eq 'wechat files') {
-        return @('YELLOW', 'WeChat data (chat history/files). In-app dedupe cleanup; move via Documents redirection. Never delete.')
+    foreach ($case in $SpecialCases) {
+        if (@($case.names) -contains $name) { return @($case.tier, $case.note) }
     }
     if ($MoveNames.ContainsKey($name)) { return @('MOVE', 'User folder. Good candidate to relocate to D: (relocation-guide).') }
     if ($GreenNames.ContainsKey($name)) { return @('GREEN', 'Rebuildable cache/temp. Deletable after closing the owning app.') }

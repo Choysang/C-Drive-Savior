@@ -15,59 +15,27 @@ from pathlib import Path
 
 GB = 1024 ** 3
 REPARSE_POINT = 0x400
-
-
-GREEN_NAMES = {
-    "npm-cache",
-    "pnpm-cache",
-    "pip",
-    "pypa",
-    "uv",
-    "node-gyp",
-    "ms-playwright",
-    "d3dscache",
-    "crashdumps",
-    "squirreltemp",
-    "temp",
-    "tmp",
-    "fontconfig",
-    "cef",
-    "chrome-devtools-mcp",
-    "tauri",
-    "cmaketools",
-    "obsidian-updater",
-    "updfsetup",
-    "winsparkle",
-}
-
-YELLOW_NAMES = {
-    "package cache",
-    "recovery",
-    "customizations",
-    "$windows.~bt",
-    "$winreagent",
-    "downloads",
-    "desktop",
-    "documents",
-    "pictures",
-    "videos",
-    "music",
-    "scoop",
-    ".git",
-}
-
-RED_PREFIXES = (
-    r"c:\windows\system32",
-    r"c:\windows\syswow64",
-    r"c:\windows\winsxs",
-    r"c:\windows\installer",
-    r"c:\windows\systemapps",
-    r"c:\windows\servicing",
-    r"c:\program files",
-    r"c:\program files (x86)",
+ROOT = Path(__file__).resolve().parents[1]
+CLASSIFICATION = json.loads(
+    (ROOT / "config" / "classification.json").read_text(encoding="utf-8")
 )
 
-MOVE_NAMES = {"downloads", "desktop", "documents", "pictures", "videos", "music"}
+GREEN_NAMES = {value.casefold() for value in CLASSIFICATION["green_names"]}
+YELLOW_NAMES = {value.casefold() for value in CLASSIFICATION["yellow_names"]}
+MOVE_NAMES = {value.casefold() for value in CLASSIFICATION["move_names"]}
+SPECIAL_CASES = tuple(
+    (
+        {value.casefold() for value in case["names"]},
+        case["tier"],
+        case["note"],
+    )
+    for case in CLASSIFICATION["special_cases"]
+)
+SYSTEM_DRIVE = os.environ.get("SystemDrive", "C:")
+RED_PREFIXES = tuple(
+    str(Path(SYSTEM_DRIVE + "\\") / Path(value.replace("/", "\\"))).casefold()
+    for value in CLASSIFICATION["protected_prefixes"]
+)
 
 
 def long_path(path: Path) -> str:
@@ -88,15 +56,18 @@ def bytes_to_gb(size: int) -> float:
 
 
 def classify(path: Path) -> tuple[str, str]:
-    lowered = str(path).lower()
-    name = path.name.lower()
+    lowered = str(path).casefold()
+    name = path.name.casefold()
 
     if any(lowered.startswith(prefix) for prefix in RED_PREFIXES):
         return "RED", "安装目录/Windows核心区域，优先用卸载器或系统工具，避免手删。"
-    if name in GREEN_NAMES or any(part.lower() in GREEN_NAMES for part in path.parts):
-        return "GREEN", "可重建缓存或临时文件；关闭相关程序后通常可删。"
+    for names, tier, note in SPECIAL_CASES:
+        if name in names:
+            return tier, note
     if name in MOVE_NAMES:
         return "MOVE", "用户文件夹；适合迁移到D盘，但需要用户确认。"
+    if name in GREEN_NAMES or any(part.casefold() in GREEN_NAMES for part in path.parts):
+        return "GREEN", "可重建缓存或临时文件；关闭相关程序后通常可删。"
     if name in YELLOW_NAMES or any(name.startswith(item) for item in ("$winreagent",)):
         return "YELLOW", "需要确认；可能影响恢复、更新、修复、卸载或用户文件。"
     if "cache" in name or "temp" in name:
