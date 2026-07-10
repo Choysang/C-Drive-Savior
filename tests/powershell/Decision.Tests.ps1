@@ -12,9 +12,9 @@ Describe 'decide.ps1' {
         Write-CdsJsonAtomic -Path (Join-Path $session.root 'session.json') -InputObject $session
 
         $rows = @(
-            [pscustomobject]@{ id = 'temp-user'; tier = 'GREEN'; path = 'C:\Users\demo\AppData\Local\Temp' },
-            [pscustomobject]@{ id = 'package-cache'; tier = 'YELLOW'; path = 'C:\ProgramData\Package Cache' },
-            [pscustomobject]@{ id = 'documents'; tier = 'MOVE'; path = 'C:\Users\demo\Documents' }
+            [pscustomobject]@{ id = 'row-temp'; action_id = 'temp-user'; tier = 'GREEN'; path = 'C:\Users\demo\AppData\Local\Temp' },
+            [pscustomobject]@{ id = 'row-package'; action_id = 'package-cache'; tier = 'YELLOW'; path = 'C:\ProgramData\Package Cache' },
+            [pscustomobject]@{ id = 'documents'; action_id = $null; tier = 'MOVE'; path = 'C:\Users\demo\Documents' }
         )
         Write-CdsJsonAtomic -Path $session.artifacts.scan -InputObject ([pscustomobject]@{
             schema_version = 2

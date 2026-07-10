@@ -74,6 +74,7 @@
       "required": [
         "id",
         "parent_id",
+        "action_id",
         "path",
         "depth",
         "logical_bytes",
@@ -86,6 +87,7 @@
       "properties": {
         "id": { "type": "string", "minLength": 1 },
         "parent_id": { "type": ["string", "null"] },
+        "action_id": { "type": ["string", "null"], "minLength": 1 },
         "path": { "type": "string", "minLength": 1 },
         "depth": { "type": "integer", "minimum": 0 },
         "logical_bytes": { "type": "integer", "minimum": 0 },

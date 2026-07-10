@@ -49,9 +49,9 @@ Describe 'clean.ps1 execution guards' {
             schema_version = 2
             session_id = $SessionId
             rows = @(
-                [pscustomobject]@{ id='temp-user'; tier='GREEN'; path=$TempPath },
-                [pscustomobject]@{ id='thumbcache'; tier='GREEN'; path=(Join-Path $LocalAppData 'Microsoft\Windows\Explorer') },
-                [pscustomobject]@{ id='wu-cache'; tier='GREEN'; path=$Root }
+                [pscustomobject]@{ id='row-temp'; action_id='temp-user'; tier='GREEN'; path=$TempPath },
+                [pscustomobject]@{ id='row-thumbs'; action_id='thumbcache'; tier='YELLOW'; path=(Join-Path $LocalAppData 'Microsoft\Windows\Explorer') },
+                [pscustomobject]@{ id='row-wu'; action_id='wu-cache'; tier='GREEN'; path=$Root }
             )
         })
         & $Decide -SessionId $SessionId -ApproveClean temp-user,thumbcache,wu-cache `
@@ -92,7 +92,7 @@ Describe 'clean.ps1 execution guards' {
         Write-CdsJsonAtomic -Path (Join-Path $alternate.root 'session.json') -InputObject $alternate
         Write-CdsJsonAtomic -Path $alternate.artifacts.scan -InputObject ([pscustomobject]@{
             schema_version=2; session_id=$alternateId
-            rows=@([pscustomobject]@{ id='temp-user'; tier='GREEN'; path=$Fixture.TempPath })
+            rows=@([pscustomobject]@{ id='row-temp'; action_id='temp-user'; tier='GREEN'; path=$Fixture.TempPath })
         })
         & $Decide -SessionId $alternateId -ApproveClean temp-user -SessionRoot $alternateRoot | Out-Null
 

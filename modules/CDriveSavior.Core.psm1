@@ -62,6 +62,56 @@ function Resolve-CdsSafePath {
     return $candidate
 }
 
+function Get-CdsCatalogRoot {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Name)
+
+    switch ($Name) {
+        'localappdata' { return [IO.Path]::GetFullPath($env:LOCALAPPDATA) }
+        'profile'      { return [IO.Path]::GetFullPath($env:USERPROFILE) }
+        'systemroot'   { return [IO.Path]::GetFullPath($env:SystemRoot) }
+        'programdata'  { return [IO.Path]::GetFullPath($env:ProgramData) }
+        default        { throw "Unknown catalog root: $Name" }
+    }
+}
+
+function Resolve-CdsCatalogSpec {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)][string]$Resolver)
+
+    if ($Resolver -in @('delivery-optimization', 'recycle-bin')) {
+        return [pscustomobject]@{ Pattern=$null; AllowedRoot=$null; Special=$Resolver }
+    }
+    $parts = $Resolver.Split(':', 2)
+    if ($parts.Count -ne 2) { throw "Invalid catalog resolver: $Resolver" }
+    if ($parts[0] -eq 'temp') {
+        return [pscustomobject]@{
+            Pattern=[IO.Path]::GetFullPath($env:TEMP)
+            AllowedRoot=(Get-CdsCatalogRoot 'localappdata')
+            Special=$null
+        }
+    }
+    $root = Get-CdsCatalogRoot $parts[0]
+    $pattern = if ($parts[1]) {
+        Join-Path $root ($parts[1].Replace('/', [IO.Path]::DirectorySeparatorChar))
+    } else { $root }
+    return [pscustomobject]@{ Pattern=$pattern; AllowedRoot=$root; Special=$null }
+}
+
+function Expand-CdsCatalogSpec {
+    [CmdletBinding()]
+    param([Parameter(Mandatory)]$Spec)
+
+    if ($Spec.Special) { return @() }
+    [void](Resolve-CdsSafePath -Path $Spec.Pattern -AllowedRoot $Spec.AllowedRoot)
+    if ($Spec.Pattern -like '*[*]*') {
+        return @(Resolve-Path -Path $Spec.Pattern -ErrorAction SilentlyContinue | ForEach-Object {
+            Resolve-CdsSafePath -Path $_.Path -AllowedRoot $Spec.AllowedRoot
+        })
+    }
+    return @([IO.Path]::GetFullPath($Spec.Pattern))
+}
+
 function Read-CdsJson {
     [CmdletBinding()]
     param([Parameter(Mandatory)][string]$Path)
@@ -69,7 +119,7 @@ function Read-CdsJson {
     if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) {
         throw "JSON file was not found: $Path"
     }
-    return Get-Content -Raw -LiteralPath $Path -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+    return Get-Content -Raw -Encoding UTF8 -LiteralPath $Path -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
 }
 
 function Write-CdsJsonAtomic {
@@ -206,13 +256,22 @@ function Assert-CdsApprovedItem {
         if ($scan.session_id -ne $SessionId) {
             throw 'Scan session ID does not match the requested session.'
         }
-        $matchingRows = @($scan.rows | Where-Object { $_.id -eq $ItemId })
-        if ($matchingRows.Count -ne 1) {
-            throw "Approved item does not have exactly one scan baseline: $ItemId"
+        $matchingRows = if ($Action -eq 'clean') {
+            @($scan.rows | Where-Object { $_.action_id -eq $ItemId -or (-not $_.PSObject.Properties['action_id'] -and $_.id -eq $ItemId) })
+        } else {
+            @($scan.rows | Where-Object { $_.id -eq $ItemId })
         }
-        $baseline = [IO.Path]::GetFullPath([string]$matchingRows[0].path)
-        if (-not (Test-CdsPathWithin -Path $target -AllowedRoot $baseline)) {
-            throw "Target is outside the approved scan baseline: $baseline"
+        $matchingRows = @($matchingRows)
+        if ($matchingRows.Count -lt 1) {
+            throw "Approved item does not have a scan baseline: $ItemId"
+        }
+        $withinBaseline = $false
+        foreach ($row in $matchingRows) {
+            $baseline = [IO.Path]::GetFullPath([string]$row.path)
+            if (Test-CdsPathWithin -Path $target -AllowedRoot $baseline) { $withinBaseline = $true; break }
+        }
+        if (-not $withinBaseline) {
+            throw 'Target is outside every approved scan baseline.'
         }
     }
     return $true
@@ -250,6 +309,9 @@ function Test-CdsElevated {
 
 Export-ModuleMember -Function @(
     'Resolve-CdsSafePath',
+    'Get-CdsCatalogRoot',
+    'Resolve-CdsCatalogSpec',
+    'Expand-CdsCatalogSpec',
     'Test-CdsPathWithin',
     'Read-CdsJson',
     'Write-CdsJsonAtomic',

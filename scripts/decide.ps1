@@ -30,6 +30,7 @@ function Test-SameValues($Left, $Right) {
 $session = Get-CdsSession -SessionId $SessionId -SessionRoot $SessionRoot
 $scan = Read-CdsJson -Path $session.artifacts.scan
 if ($scan.session_id -ne $SessionId) { throw 'Scan session ID does not match the requested session.' }
+$classification = Read-CdsJson -Path (Join-Path (Split-Path $PSScriptRoot -Parent) 'config\classification.json')
 
 $rowsById = @{}
 foreach ($row in @($scan.rows)) {
@@ -40,8 +41,10 @@ foreach ($row in @($scan.rows)) {
 $approvedClean = @(Get-NormalizedValues $ApproveClean)
 $approvedMove = @(Get-NormalizedValues $ApproveMove)
 foreach ($itemId in $approvedClean) {
-    if (-not $rowsById.ContainsKey($itemId)) { throw "Item is not present in scan: $itemId" }
-    if ($rowsById[$itemId].tier -ne 'GREEN') { throw "Item is not GREEN and cannot be approved for clean: $itemId" }
+    $matchingRows = @($scan.rows | Where-Object { $_.action_id -eq $itemId -or (-not $_.PSObject.Properties['action_id'] -and $_.id -eq $itemId) })
+    if ($matchingRows.Count -lt 1) { throw "Item is not present in scan: $itemId" }
+    $catalogItems = @($classification.cleanup_items | Where-Object id -eq $itemId)
+    if ($catalogItems.Count -ne 1 -or $catalogItems[0].tier -ne 'GREEN') { throw "Item is not GREEN and cannot be approved for clean: $itemId" }
 }
 foreach ($itemId in $approvedMove) {
     if (-not $rowsById.ContainsKey($itemId)) { throw "Item is not present in scan: $itemId" }

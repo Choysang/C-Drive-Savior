@@ -34,6 +34,12 @@ class SchemaFileTests(unittest.TestCase):
             ["planned", "completed", "partial", "failed", "skipped", "not-found"],
         )
 
+    def test_scan_rows_expose_a_nullable_cleanup_action_id(self) -> None:
+        schema = self.load_schema("scan-v2.schema.json")
+        row = schema["$defs"]["row"]
+        self.assertIn("action_id", row["required"])
+        self.assertEqual(row["properties"]["action_id"]["type"], ["string", "null"])
+
 
 if __name__ == "__main__":
     unittest.main()

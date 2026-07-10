@@ -13,7 +13,7 @@ BeforeAll {
             schema_version=2; session_id=$sessionId; generated_at=(Get-Date).ToUniversalTime().ToString('o')
             source_engine='powershell'; engine_version='test'; scan_complete=$true; scan_seconds=1
             drives=@([pscustomobject]@{letter='C:';filesystem='NTFS';total_bytes=[long]100GB;used_bytes=[long]90GB;free_bytes=[long]10GB})
-            rows=@([pscustomobject]@{id=$rowId;parent_id=$null;path="C:\$rowId";depth=0;logical_bytes=[long]2GB;unique_bytes=[long]2GB;exclusive_bytes=[long]2GB;size_accuracy='logical';tier='GREEN';note=$note})
+            rows=@([pscustomobject]@{id=$rowId;parent_id=$null;action_id=$null;path="C:\$rowId";depth=0;logical_bytes=[long]2GB;unique_bytes=[long]2GB;exclusive_bytes=[long]2GB;size_accuracy='logical';tier='GREEN';note=$note})
             hidden=@(); denied_paths=@(); skipped_reparse_points=@()
             accounting=[pscustomobject]@{visible_unique_bytes=[long]2GB;hidden_unique_bytes=[long]0;duplicate_hidden_bytes=[long]0;reconciliation_is_estimate=$true}
             system_and_other_bytes=[long]88GB

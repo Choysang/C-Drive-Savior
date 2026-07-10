@@ -15,47 +15,6 @@ $skillRoot = Split-Path $PSScriptRoot -Parent
 Import-Module (Join-Path $skillRoot 'modules\CDriveSavior.Core.psm1') -Force
 $classification = Read-CdsJson -Path (Join-Path $skillRoot 'config\classification.json')
 
-function Get-CatalogRoot([string]$Name) {
-    switch ($Name) {
-        'localappdata' { return [IO.Path]::GetFullPath($env:LOCALAPPDATA) }
-        'profile'      { return [IO.Path]::GetFullPath($env:USERPROFILE) }
-        'systemroot'   { return [IO.Path]::GetFullPath($env:SystemRoot) }
-        'programdata'  { return [IO.Path]::GetFullPath($env:ProgramData) }
-        default        { throw "Unknown catalog root: $Name" }
-    }
-}
-
-function Resolve-CatalogSpec([string]$Resolver) {
-    if ($Resolver -in @('delivery-optimization', 'recycle-bin')) {
-        return [pscustomobject]@{ Pattern=$null; AllowedRoot=$null; Special=$Resolver }
-    }
-    $parts = $Resolver.Split(':', 2)
-    if ($parts.Count -ne 2) { throw "Invalid catalog resolver: $Resolver" }
-    if ($parts[0] -eq 'temp') {
-        return [pscustomobject]@{
-            Pattern=[IO.Path]::GetFullPath($env:TEMP)
-            AllowedRoot=(Get-CatalogRoot 'localappdata')
-            Special=$null
-        }
-    }
-    $root = Get-CatalogRoot $parts[0]
-    $pattern = if ($parts[1]) {
-        Join-Path $root ($parts[1].Replace('/', [IO.Path]::DirectorySeparatorChar))
-    } else { $root }
-    return [pscustomobject]@{ Pattern=$pattern; AllowedRoot=$root; Special=$null }
-}
-
-function Expand-CatalogSpec($Spec) {
-    if ($Spec.Special) { return @() }
-    [void](Resolve-CdsSafePath -Path $Spec.Pattern -AllowedRoot $Spec.AllowedRoot)
-    if ($Spec.Pattern -like '*[*]*') {
-        return @(Resolve-Path -Path $Spec.Pattern -ErrorAction SilentlyContinue | ForEach-Object {
-            Resolve-CdsSafePath -Path $_.Path -AllowedRoot $Spec.AllowedRoot
-        })
-    }
-    return @([IO.Path]::GetFullPath($Spec.Pattern))
-}
-
 function Assert-NoReparseDescendant([string]$Path) {
     if (-not (Test-Path -LiteralPath $Path)) { return }
     $item = Get-Item -LiteralPath $Path -Force
@@ -162,7 +121,7 @@ function Complete-Action($Action, [string]$Status, $Before, $After, [string[]]$E
 function Get-ItemTargets($Item) {
     $targets = New-Object System.Collections.Generic.List[object]
     foreach ($resolver in @($Item.resolvers)) {
-        $spec = Resolve-CatalogSpec $resolver
+        $spec = Resolve-CdsCatalogSpec $resolver
         if ($spec.Special) {
             if ($spec.Special -eq 'recycle-bin') {
                 $driveRoot = [IO.Path]::GetPathRoot("$env:SystemDrive\")
@@ -184,7 +143,7 @@ function Get-ItemTargets($Item) {
             }
             continue
         }
-        foreach ($path in @(Expand-CatalogSpec $spec)) {
+        foreach ($path in @(Expand-CdsCatalogSpec $spec)) {
             $targets.Add([pscustomobject]@{ Path=$path; AllowedRoot=$spec.AllowedRoot; Special=$null })
         }
     }

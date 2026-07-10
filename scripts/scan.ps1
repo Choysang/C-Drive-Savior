@@ -21,6 +21,18 @@ $moveNames = @{}; foreach ($name in $classification.move_names) { $moveNames[$na
 $protectedPrefixes = @($classification.protected_prefixes | ForEach-Object {
     (Join-Path $env:SystemDrive ($_.Replace('/', [IO.Path]::DirectorySeparatorChar))).ToLowerInvariant()
 })
+$actionIdsByPath = @{}
+foreach ($item in @($classification.cleanup_items)) {
+    foreach ($resolver in @($item.resolvers)) {
+        try {
+            $spec = Resolve-CdsCatalogSpec $resolver
+            foreach ($path in @(Expand-CdsCatalogSpec $spec)) {
+                $key = [IO.Path]::GetFullPath($path).TrimEnd('\').ToLowerInvariant()
+                if (-not $actionIdsByPath.ContainsKey($key)) { $actionIdsByPath[$key] = [string]$item.id }
+            }
+        } catch { continue }
+    }
+}
 
 function Get-StableId([string]$Path) {
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -79,10 +91,12 @@ while ($stack.Count -gt 0) {
             $states[$state.parent].logical += $state.logical
             $states[$state.parent].unique += $state.unique
         }
-        if ($state.depth -le $MaxReportDepth -and ($state.path -eq $root -or $state.unique -ge $threshold)) {
+        $actionKey = [IO.Path]::GetFullPath($state.path).TrimEnd('\').ToLowerInvariant()
+        $actionId = if($actionIdsByPath.ContainsKey($actionKey)){$actionIdsByPath[$actionKey]}else{$null}
+        if (($state.depth -le $MaxReportDepth -and ($state.path -eq $root -or $state.unique -ge $threshold)) -or $actionId) {
             $tier = Get-ScanTier $state.path
             $rows.Add([pscustomobject][ordered]@{
-                id=$state.id; parent_id=$state.parent_id; path=$state.path; depth=[int]$state.depth
+                id=$state.id; parent_id=$state.parent_id; action_id=$actionId; path=$state.path; depth=[int]$state.depth
                 logical_bytes=[long]$state.logical; unique_bytes=[long]$state.unique
                 exclusive_bytes=[long]$state.direct_unique
                 size_accuracy=if($allocationAccurate){'file-id-deduplicated'}else{'logical'}

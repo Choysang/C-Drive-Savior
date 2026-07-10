@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import ctypes
 import datetime as dt
+import glob
 import hashlib
 import html
 import json
@@ -65,6 +66,10 @@ def stable_id(path: Path) -> str:
     return hashlib.sha256(str(path).casefold().encode("utf-8")).hexdigest()[:20]
 
 
+def path_key(path: str | Path) -> str:
+    return os.path.normcase(os.path.realpath(os.path.abspath(path)))
+
+
 def classify(path: Path) -> tuple[str, str]:
     lowered = str(path).casefold()
     name = path.name.casefold()
@@ -83,6 +88,43 @@ def classify(path: Path) -> tuple[str, str]:
     if "cache" in name or "temp" in name:
         return "GREEN", "Cache-like name; verify ownership before cleanup."
     return "YELLOW", "Large item requiring a human decision."
+
+
+def cleanup_action_ids() -> dict[str, str]:
+    roots = {
+        "localappdata": Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")),
+        "profile": Path(os.environ.get("USERPROFILE", Path.home())),
+        "systemroot": Path(os.environ.get("SystemRoot", "C:\\Windows")),
+        "programdata": Path(os.environ.get("ProgramData", "C:\\ProgramData")),
+    }
+    result: dict[str, str] = {}
+    for item in CLASSIFICATION["cleanup_items"]:
+        for resolver in item["resolvers"]:
+            if resolver in {"delivery-optimization", "recycle-bin"}:
+                continue
+            name, separator, relative = resolver.partition(":")
+            if not separator:
+                raise ValueError(f"invalid catalog resolver: {resolver}")
+            if name == "temp":
+                allowed_root = roots["localappdata"]
+                pattern = Path(os.environ.get("TEMP", allowed_root / "Temp"))
+            else:
+                if name not in roots:
+                    raise ValueError(f"unknown catalog root: {name}")
+                allowed_root = roots[name]
+                pattern = allowed_root / Path(relative.replace("/", os.sep))
+            candidates = [Path(value) for value in glob.glob(str(pattern))] if glob.has_magic(str(pattern)) else [pattern]
+            for candidate in candidates:
+                candidate_key = path_key(candidate)
+                allowed_key = path_key(allowed_root)
+                try:
+                    within_root = os.path.commonpath((candidate_key, allowed_key)) == allowed_key
+                except ValueError:
+                    within_root = False
+                if not within_root:
+                    continue
+                result.setdefault(candidate_key, item["id"])
+    return result
 
 
 def stat_is_reparse(stat_result: os.stat_result) -> bool:
@@ -174,6 +216,7 @@ def scan_root(root: Path, threshold: int, max_report_depth: int) -> dict:
     root = root.resolve(strict=True)
     if not root.is_dir():
         raise NotADirectoryError(root)
+    action_ids = cleanup_action_ids()
 
     states: dict[str, dict[str, Any]] = {}
     rows: list[dict] = []
@@ -204,14 +247,17 @@ def scan_root(root: Path, threshold: int, max_report_depth: int) -> dict:
                 parent = states[state["parent"]]
                 parent["logical"] += state["logical"]
                 parent["unique"] += state["unique"]
-            if state["depth"] <= max_report_depth and (
-                current_key == root_key or state["unique"] >= threshold
-            ):
+            action_id = action_ids.get(path_key(current))
+            if (
+                state["depth"] <= max_report_depth
+                and (current_key == root_key or state["unique"] >= threshold)
+            ) or action_id:
                 tier, note = classify(current)
                 rows.append(
                     {
                         "id": state["id"],
                         "parent_id": state["parent_id"],
+                        "action_id": action_id,
                         "path": display_path(current),
                         "depth": int(state["depth"]),
                         "logical_bytes": int(state["logical"]),

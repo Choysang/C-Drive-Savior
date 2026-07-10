@@ -4,6 +4,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 from scripts import c_drive_panel as scanner
 
@@ -56,6 +57,18 @@ class ScannerTests(unittest.TestCase):
         self.assertIn(shared_script, rendered)
         self.assertNotIn("__REPORT_DATA__", rendered)
         self.assertNotIn("__REPORT_SCRIPT__", rendered)
+
+    def test_catalog_cleanup_id_is_linked_to_the_scanned_path(self) -> None:
+        target = self.root / "cache-a"
+        with patch.dict(os.environ, {"LOCALAPPDATA": str(self.root), "TEMP": str(target)}):
+            report = scanner.scan_root(self.root, threshold=100 * scanner.GB, max_report_depth=0)
+        target_key = scanner.path_key(target)
+        row = next(
+            item
+            for item in report["rows"]
+            if scanner.path_key(item["path"]) == target_key
+        )
+        self.assertEqual(row["action_id"], "temp-user")
 
 
 if __name__ == "__main__":
