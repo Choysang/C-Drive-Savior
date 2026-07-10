@@ -14,7 +14,7 @@ Use one guarded session through five phases: **Scan -> Confirm -> Clean -> Migra
 3. Run exactly one scanner for the operational session. Keep the printed Session ID and pass the same `-SessionId` and `-SessionRoot` through every later phase.
 4. Ask once. Present every GREEN action ID, YELLOW consequence, RED refusal, MOVE row ID/destination, protected path, and unused-app candidate in one numbered decision list.
 5. Use the bundled scripts for filesystem actions. Never construct direct deletion commands. YELLOW and RED rows are explanations or official-tool/manual workflows, not inputs to `clean.ps1`.
-6. Never claim a complete scan when `scan_complete` is false. Name denied paths and skipped reparse points.
+6. Never claim a complete scan when `scan_complete` is false. Repeat every concrete denied path and skipped reparse point supplied by the scan or user; do not replace them with a generic warning.
 7. Report raw measured bytes. Keep disk-level net change separate from action-attributable released bytes; show failures and partial results.
 
 Set one root for the whole session:
@@ -59,6 +59,8 @@ After the user answers, record the entire immutable decision:
 
 Use only IDs present in that scan. If the answer changes later, create a new scan session; do not overwrite the existing decision.
 
+If the user provides an existing Session ID plus explicit approved IDs, continue that session. Do not demand a rescan merely because the earlier scanner was Python. When the user states that `decide.ps1` already recorded those IDs, generate the same-session bundled clean/admin command and let the script validate the artifacts; do not demand screenshots or claim that `actions.jsonl` proves a decision.
+
 ## Phase 3: Approved GREEN cleanup
 
 Preview selected catalog items first:
@@ -75,6 +77,8 @@ Execute user-level items only after the decision exists:
 ```
 
 For admin items, preserve the same session ID and root. Ask the user to run the equivalent bundled `clean.ps1` command in an administrator PowerShell, or use `Start-Process powershell -Verb RunAs` with those exact values. Never omit `-SessionId`; never replace the script with ad hoc `Remove-Item` commands. Read `actions.jsonl` afterward and report locked, skipped, partial, or service-restoration failures.
+
+If a user says “approve everything,” still state the invariant boundary: RED is refused, YELLOW never enters `clean.ps1`, GREEN uses only scanned `action_id`, and MOVE uses only scanned row `id` after destination confirmation.
 
 Windows servicing is outside routine GREEN cleanup. Only discuss `DISM /StartComponentCleanup` after the health gate in `pitfalls.md` #6 passes. Do not suggest `/ResetBase` as routine cleanup.
 

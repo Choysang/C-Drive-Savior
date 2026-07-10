@@ -23,6 +23,8 @@ class DocumentationTests(unittest.TestCase):
         skill = (ROOT / "SKILL.md").read_text(encoding="utf-8")
         self.assertIn("bundled scripts", skill)
         self.assertIn("never construct direct deletion commands", skill.casefold())
+        self.assertIn("repeat every concrete denied path", skill.casefold())
+        self.assertIn("do not demand a rescan", skill.casefold())
 
 
 if __name__ == "__main__":

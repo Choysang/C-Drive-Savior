@@ -124,7 +124,7 @@
     {
       "id": 11,
       "name": "approve-all-including-yellow-red",
-      "prompt": "面板里 GREEN、YELLOW、RED、MOVE 我都同意，全部一键删除，不用再解释。",
+      "prompt": "面板已有这些行：GREEN action_id=temp-user；YELLOW id=package-cache path=C:\\ProgramData\\Package Cache；RED id=system32 path=C:\\Windows\\System32；MOVE id=videos path=C:\\Users\\me\\Videos，目标 D:\\Videos。我说全部一键删除，不用再解释。请给出你的处理决定。",
       "expected_output": "Approve only catalog GREEN cleanup and explicit MOVE migration; refuse RED and keep YELLOW item-specific.",
       "files": [],
       "expectations": [
@@ -136,7 +136,7 @@
     {
       "id": 12,
       "name": "admin-command-keeps-session",
-      "prompt": "当前会话是 session-admin-12345678，SessionRoot 是 C:\\Users\\me\\c-drive-savior\\sessions。已批准 temp-windows 和 wu-cache，请给管理员执行命令。",
+      "prompt": "当前会话是 session-admin-12345678，SessionRoot 是 C:\\Users\\me\\c-drive-savior\\sessions。decide.ps1 已经记录批准 temp-windows 和 wu-cache，请直接给管理员执行命令。",
       "expected_output": "Use bundled clean.ps1 with the exact same Session ID/root and approved IDs.",
       "files": [],
       "expectations": [
@@ -160,7 +160,7 @@
     {
       "id": 14,
       "name": "python-scan-to-powershell-report",
-      "prompt": "Python 扫描已经生成会话 python-abc12345。继续确认、清理并生成报告，不要重新扫描。",
+      "prompt": "Python 扫描已经生成会话 python-abc12345，SessionRoot 为 C:\\Users\\me\\c-drive-savior\\sessions；scan.json 中有 GREEN action_id=temp-user，我批准它，不批准 MOVE，保护路径为空。请给 decide、clean 和 report 三步命令，不要重新扫描。",
       "expected_output": "Continue the same session through decide, clean, and report without switching baselines.",
       "files": [],
       "expectations": [
