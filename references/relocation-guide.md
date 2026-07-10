@@ -4,6 +4,33 @@ Priority order for ANY relocation: **app-native setting > official export/import
 
 Preflight for every move (see pitfalls.md #23): D: free space > source × 1.1; D: is a fixed internal disk; source not OneDrive-managed; owning app closed.
 
+## 0. C Drive Savior staged migration
+
+Use the migration script only after the scan decision has approved the MOVE item. Migration is deliberately split into two invocations:
+
+```powershell
+# 1. Copy to the fixed non-system volume. The source remains untouched.
+.\scripts\migrate.ps1 -Stage -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -SessionId '<session-id>' -SessionRoot '<session-root>'
+
+# 2. Close and reopen the owning application. Exercise its normal read/write workflow.
+#    Do not finalize until this smoke test succeeds.
+
+# 3a. Remove the source only after fresh metadata and SHA-256 verification.
+.\scripts\migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -DeleteSource -SessionId '<session-id>' -SessionRoot '<session-root>'
+
+# 3b. Or replace the source with a validated junction when the application cannot change paths.
+.\scripts\migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -Junction -SessionId '<session-id>' -SessionRoot '<session-root>'
+```
+
+Stage records relative paths, lengths, UTC timestamps, attributes, alternate stream names, and effective ACL fingerprints. Data is copied without robocopy's privileged security flag; the script then applies source ACLs as the destination owner and verifies equivalent owner/group/access rules, including the destination root. Finalize rebuilds both manifests. Before source deletion it also hashes every source and destination file; large trees can therefore take about as long as reading the full dataset twice. Keep the same Session ID/root in both calls and require an explicit user report that the owning application passed its read/write smoke test before Finalize.
+
+Migration is blocked for EFS-encrypted, sparse, or reparse-point content because an ordinary copy may not preserve those semantics. Stage also refuses OneDrive-managed paths, system/install areas, overlapping source/destination paths, non-fixed targets, and insufficient destination space.
+
+Rollback is not transactional. Before Finalize, rollback means deleting the staged destination. After `-DeleteSource`, the recorded undo is a verified copy back from D: to C:. After `-Junction`, remove the junction first, then copy back. If junction creation fails after source deletion, the verified data remains at the destination; the tool reports failure and does not claim the source was restored.
+
 ## 1. User known folders (Desktop / Documents / Downloads / Pictures / Videos / Music)
 
 Best method — Explorer GUI: right-click folder -> 属性 -> 位置 (Properties -> Location) -> Move to `D:\Users\<name>\<folder>` -> let Windows migrate files. Windows updates the registry and most apps follow.

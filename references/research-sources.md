@@ -2,6 +2,10 @@
 
 Distilled official guidance used by this skill. Prefer these sources when explaining risk to users.
 
+## Evidence policy
+
+Microsoft Learn/Support and application-native documentation define supported system, uninstall, known-folder, and storage operations. Community sources may identify a product-specific workflow or failure mode, but they do not override the safety gates in the scripts. Performance statements require a saved local benchmark from `benchmarks/run-scanners.ps1`; reclaim estimates require the current session's raw bytes. When product behavior or Windows servicing guidance may have changed, verify the current official page before advising the user.
+
 ## Microsoft: Free Up Drive Space In Windows
 
 Source: https://support.microsoft.com/en-us/windows/experience/storage-filemanagement/free-up-drive-space-in-windows

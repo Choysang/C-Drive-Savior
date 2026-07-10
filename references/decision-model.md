@@ -11,6 +11,12 @@ Core framing (from storage-analyzer, improved): the tier list is a **decision li
 - `RED` — do not hand-delete, ever. Official tools/uninstallers only.
 - `MOVE` — user-owned data relocatable to D: without breaking apps (Phase 4, see relocation-guide.md).
 
+## IDs and execution boundaries
+
+Every reported directory has a path-hash `id`. Use that ID for a `MOVE` decision because migration must match one exact source row. A row may also have `action_id`; this comes only from `config/classification.json` and connects one or more measured paths to a constrained GREEN cleaner action. Use `action_id` for `-ApproveClean`.
+
+An `action_id` is retained even when its path is below the normal size threshold or report depth, so known cache actions do not disappear from the confirmation list. It is not permission by itself: `decide.ps1` must record it in the current session, and `clean.ps1` checks each resolved target against every scanned baseline and protected path. Rows without `action_id` never become direct filesystem deletion commands.
+
 ## Hidden consumers (report separately — folder scans miss these)
 
 | Item | How to measure | How to shrink |

@@ -1,88 +1,129 @@
 ---
 name: c-drive-savior
-description: C Drive Savior / C盘拯救者. Windows C drive diagnosis, safe cleanup, move-to-D migration, and cleanup reporting. Use whenever the user says C盘满了, C盘快满了, 清理C盘, 电脑空间不够, 磁盘空间不足, 帮我清理电脑空间, C盘瘦身, 把文件移到D盘, analyze C drive, clean system drive, disk full, or asks what can be deleted or moved to D:. Scans first with a disk-usage panel, classifies large items by risk, cleans rebuildable caches, migrates user data to D: with verification, and produces a before/after cleanup report.
+description: C Drive Savior / C盘拯救者. Windows C drive diagnosis, safe cleanup, move-to-D migration, and measured reporting. Use whenever the user says C盘满了, C盘快满了, 清理C盘, 电脑空间不足, 帮我清理电脑空间, C盘瘦身, 把文件移到D盘, analyze C drive, clean system drive, disk full, or asks what can be deleted or moved to D:. Scan first, collect one confirmation, execute only approved catalog actions in one guarded session, stage verified migrations, and report measured results.
 ---
 
 # C Drive Savior / C盘拯救者
 
-Five-phase pipeline: **Scan panel -> Confirm -> Safe clean -> Migrate to D: -> Report**. Read-only until the user approves. All scripts are PowerShell 5.1/7 compatible; paths below are relative to this skill's directory.
+Use one guarded session through five phases: **Scan -> Confirm -> Clean -> Migrate -> Report**. Runtime scripts support Windows PowerShell 5.1 and PowerShell 7. Python is an optional alternative scanner, not a requirement.
 
-## Iron rules
+## Non-negotiable rules
 
-1. **Read-only first.** No delete/move/uninstall/registry change before the panel is shown and the user confirms.
-2. **Read `references/pitfalls.md` before writing any cleanup command.** Every entry is a real past failure ($-path expansion, locked files, the /ResetBase incident, Package Cache breakage, elevation, robocopy semantics...).
-3. **One confirmation round, not twenty.** Collect ALL items needing a decision into one numbered list; the user answers once.
-4. **Servicing health gate.** Never run DISM cleanup / touch WinSxS before `AnalyzeComponentStore` says the store is healthy (pitfalls.md #6). Never suggest `/ResetBase` casually.
-5. **Report actuals.** Freed space is measured, failures are listed with their errors. Never fabricate results.
+1. Start read-only. Do not delete, move, uninstall, change registry values, stop services, or run servicing cleanup before showing the scan panel and receiving approval.
+2. Read `references/pitfalls.md` before generating any action. It records real failures involving `$` paths, Package Cache, DISM, reparse points, elevation, encoding, sessions, and verification.
+3. Run exactly one scanner for the operational session. Keep the printed Session ID and pass the same `-SessionId` and `-SessionRoot` through every later phase.
+4. Ask once. Present every GREEN action ID, YELLOW consequence, RED refusal, MOVE row ID/destination, protected path, and unused-app candidate in one numbered decision list.
+5. Use the bundled scripts for filesystem actions. Never construct direct deletion commands. YELLOW and RED rows are explanations or official-tool/manual workflows, not inputs to `clean.ps1`.
+6. Never claim a complete scan when `scan_complete` is false. Repeat every concrete denied path and skipped reparse point supplied by the scan or user; do not replace them with a generic warning.
+7. Report raw measured bytes. Keep disk-level net change separate from action-attributable released bytes; show failures and partial results.
 
-## Phase 1 — Scan + panel (read-only)
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/scan.ps1 -ThresholdGB 1 -OpenReport
-```
-- Produces: console panel (disk bar + insight + hidden consumers + tier table), `scan-*.json` (the report baseline — keep it), HTML dashboard.
-- Hidden consumers (pagefile/hiberfil/VSS/Recycle Bin/update cache) are listed separately — folder scans cannot see them; use them to explain "where did my disk go".
-- Elevated shell gives more data (VSS size; `-AnalyzeWinSxS` adds true WinSxS size). Not required.
-- Alternative scanner: `python scripts/c_drive_panel.py --threshold-gb 1 --open` (faster on huge trees if Python exists).
-- Summarize in chat: one-line insight (top consumer + estimated reclaimable), then the top items. Don't paste the whole table.
-
-## Phase 2 — One-round confirmation
-
-Build ONE numbered decision list from scan rows + `references/decision-model.md` tiers:
-1. GREEN batch (list ids + total GB) — approve auto-clean? Any folder to protect/keep?
-2. Each YELLOW item — state the concrete consequence (use decision-model.md prompt patterns): repair-cache loss, rollback loss, chat data, orphaned apps, hiberfil/pagefile trade-offs.
-3. Unused software candidates (by size + last-used evidence) — uninstall via official uninstaller only.
-4. MOVE candidates + destination (default `D:\MovedFromC\...`).
-
-Wait for the user's answers. Record decisions; do not re-ask later.
-
-## Phase 3 — Safe clean (GREEN)
+Set one root for the whole session:
 
 ```powershell
-# preview (default = dry-run, measures only)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1
-# execute user-level items (close flagged processes first; script skips locked apps)
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/clean.ps1 -Execute [-Exclude id,id]
-# admin items (Windows temp, update cache, WER, dumps, recycle bin) - UAC prompt:
-Start-Process powershell -Verb RunAs -ArgumentList '-ExecutionPolicy','Bypass','-File','<abs path>\scripts\clean.ps1','-Execute','-Include','temp-windows,wu-cache,delivery-opt,minidump,memdump,wer-system,recyclebin'
+$sessionRoot = "$env:USERPROFILE\c-drive-savior\sessions"
 ```
-- Agent shells usually cannot elevate (pitfalls.md #5): hand the `Start-Process -Verb RunAs` line to the user, or have them paste into an admin PowerShell. Logs land in `%USERPROFILE%\c-drive-savior\actions-*.json` either way.
-- Supported system cleanup on top (admin, optional): Storage Sense one-off; `Dism /Online /Cleanup-Image /StartComponentCleanup` ONLY behind the health gate.
-- YELLOW items the user approved: execute individually with exact quoting from pitfalls.md #1 (`-LiteralPath`, single quotes for `$` paths).
 
-## Phase 4 — Migrate to D:
+## Phase 1: Scan and panel
 
-Priority: **app-native setting > official export/import > known-folder redirection > junction** (`references/relocation-guide.md` has per-app steps: WeChat 4.0, QQ/钉钉/WPS, Steam, Docker, WSL, dev caches, OneDrive, pagefile, iTunes backups, CompactOS).
-
-Generic folder mover (preflight + robocopy + verify + undo log):
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/migrate.ps1 -Source 'C:\path' [-Dest 'D:\...'] [-Junction | -DeleteSource] -Execute
-```
-- Known folders (Desktop/Documents/Downloads...): registry redirection per relocation-guide.md #1, NOT bare moves. Moving Documents also carries WeChat 4.0 data.
-- The script refuses OneDrive paths, system dirs, and short-on-space targets by design.
-- After each migration, verify the owning app still works before deleting any kept source copy.
-
-## Phase 5 — Cleanup report
+Choose exactly one scanner.
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/report.ps1 -Baseline <scan-*.json from Phase 1> -OpenReport
+# Canonical, zero third-party runtime dependencies
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/scan.ps1 `
+  -ThresholdGB 1 -SessionRoot $sessionRoot -OpenReport
+
+# Optional alternative when Python is already installed
+python scripts/c_drive_panel.py --threshold-gb 1 --session-root "$sessionRoot" --open
 ```
-- HTML + console: net freed GB (disk-level, hero number), before/after bars, per-action table with undo notes, skipped/failed items, maintenance advice.
-- In chat, lead with the outcome: "释放了 X GB（C: 可用 A -> B GB）", then top contributors, then failures/skips with reasons.
+
+Capture the printed Session ID. Read that session's `scan.json` and `panel.html`. Summarize the disk state, one-line insight, Top 5, cleanup rows with `action_id`, MOVE rows with `id`, hidden/system gap, denied paths, and whether the scan completed. Do not combine output from both scanners.
+
+## Phase 2: One-round decision
+
+Read `references/decision-model.md`, then present one numbered list:
+
+1. GREEN cleanup actions: `action_id`, path, measured bytes, rebuild effect, owning process, and whether admin is needed.
+2. YELLOW rows: exact consequence and recommendation to keep, use an official UI, back up, uninstall, or migrate.
+3. RED rows: explain why hand deletion is refused and name the supported tool or uninstaller.
+4. MOVE rows: row `id`, source, proposed fixed non-system destination, and migration method.
+5. Protected paths and software the user confirms they no longer need.
+
+After the user answers, record the entire immutable decision:
+
+```powershell
+& scripts/decide.ps1 -SessionId $sid -SessionRoot $sessionRoot `
+  -ApproveClean @('temp-user','npm') `
+  -ApproveMove @('<move-row-id>') `
+  -Protect @('C:\Users\name\Documents\keep')
+```
+
+Use only IDs present in that scan. If the answer changes later, create a new scan session; do not overwrite the existing decision.
+
+If the user provides an existing Session ID plus explicit approved IDs, continue that session. Do not demand a rescan merely because the earlier scanner was Python. When the user states that `decide.ps1` already recorded those IDs, generate the same-session bundled clean/admin command and let the script validate the artifacts; do not demand screenshots or claim that `actions.jsonl` proves a decision.
+
+## Phase 3: Approved GREEN cleanup
+
+Preview selected catalog items first:
+
+```powershell
+& scripts/clean.ps1 -Include @('temp-user','npm')
+```
+
+Execute user-level items only after the decision exists:
+
+```powershell
+& scripts/clean.ps1 -Execute -SessionId $sid -SessionRoot $sessionRoot `
+  -Include @('temp-user','npm')
+```
+
+For admin items, preserve the same session ID and root. Ask the user to run the equivalent bundled `clean.ps1` command in an administrator PowerShell, or use `Start-Process powershell -Verb RunAs` with those exact values. Never omit `-SessionId`; never replace the script with ad hoc `Remove-Item` commands. Read `actions.jsonl` afterward and report locked, skipped, partial, or service-restoration failures.
+
+If a user says “approve everything,” still state the invariant boundary: RED is refused, YELLOW never enters `clean.ps1`, GREEN uses only scanned `action_id`, and MOVE uses only scanned row `id` after destination confirmation.
+
+Windows servicing is outside routine GREEN cleanup. Only discuss `DISM /StartComponentCleanup` after the health gate in `pitfalls.md` #6 passes. Do not suggest `/ResetBase` as routine cleanup.
+
+## Phase 4: Verified migration
+
+Prefer application settings, official export/import, and Windows known-folder redirection. Use the generic mover only for an approved MOVE row and after reading `references/relocation-guide.md`.
+
+```powershell
+# Stage copies and verifies; source remains untouched
+& scripts/migrate.ps1 -Stage -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -SessionId $sid -SessionRoot $sessionRoot
+```
+
+Stop and ask the user to reopen the owning application and exercise normal read/write behavior. Do not Finalize until the user confirms that smoke test.
+
+```powershell
+# Choose one only after user verification
+& scripts/migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -DeleteSource -SessionId $sid -SessionRoot $sessionRoot
+
+& scripts/migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
+  -Junction -SessionId $sid -SessionRoot $sessionRoot
+```
+
+The script refuses OneDrive paths, system/install locations, overlapping targets, unsafe file semantics, removable/system destinations, insufficient space, manifest drift, and hash mismatches. Prefer `-DeleteSource`; use a junction only when an application cannot change its path and OneDrive is not involved.
+
+## Phase 5: Session report
+
+```powershell
+& scripts/report.ps1 -SessionId $sid -SessionRoot $sessionRoot -OpenReport
+```
+
+Lead with: disk-level net released bytes and C: free space before/after. Then show action-attributable bytes, the difference, top completed actions, partial/failed/skipped entries, undo information, denied scan paths, and maintenance advice. Never merge historical action logs or convert a malformed action into success.
 
 ## Never do
 
-- Hand-delete: `System32`, `SysWOW64`, `WinSxS`, `C:\Windows\Installer`, `SystemApps`, `servicing`, `WindowsApps`, whole `Program Files`/`Common Files`/`ProgramData`, whole browser `User Data`, `%LOCALAPPDATA%\Packages`.
-- DISM `/ResetBase` without explicit consent AND a healthy store; any WinSxS surgery when `Catalogs` is missing or sfc fails — recommend in-place repair instead.
-- Bulk-delete `Package Cache` / `Windows Installer` (breaks repair/uninstall — real incident, pitfalls.md #7).
-- Junction OneDrive-managed folders; drag-move installed apps to D:.
-- Delete chat data (`xwechat_files`, `WeChat Files`, QQ) or user files without an explicit per-item decision.
-- Registry "cleaners".
+- Hand-delete `System32`, `SysWOW64`, `WinSxS`, `Windows\Installer`, `SystemApps`, `servicing`, `WindowsApps`, whole `Program Files`, `Common Files`, whole `ProgramData`, whole browser `User Data`, or whole `%LOCALAPPDATA%\Packages`.
+- Bulk-delete `Package Cache` or installer caches. Prefer named-app uninstall/reinstall or backup-to-D after explicit acceptance of repair loss.
+- Delete chat history, cloud sync roots, project data, Downloads, Desktop, or Documents without an item-specific decision.
+- Junction a OneDrive-managed path, drag-move an installed app, use registry cleaners, follow reparse points, or delete a migration source before fresh verification.
 
 ## References
 
-- `references/pitfalls.md` — 24 field-tested failures + fixes. **Read before any command.**
-- `references/decision-model.md` — GREEN/YELLOW/RED/MOVE catalog, hidden consumers, execution order, prompt patterns.
-- `references/relocation-guide.md` — per-app move-to-D playbook.
-- `references/research-sources.md` — distilled official guidance (Microsoft Learn/Support).
-- `scripts/` — `scan.ps1` (panel), `clean.ps1` (tier-1, dry-run default), `migrate.ps1` (move+verify+junction), `report.ps1` (before/after), `c_drive_panel.py` (alt scanner).
+- `references/pitfalls.md`: mandatory failure catalog before any action.
+- `references/decision-model.md`: tier meanings, action IDs, and one-round prompt structure.
+- `references/relocation-guide.md`: app-native moves and Stage/Finalize migration.
+- `references/research-sources.md`: evidence and source policy.
+- `benchmarks/README.md`: reproducible scanner benchmark method; do not invent performance claims.

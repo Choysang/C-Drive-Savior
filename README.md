@@ -1,109 +1,141 @@
-# C Drive Savior · C盘拯救者
+# C Drive Savior / C盘拯救者
 
-> 让 AI Agent 像一个懂 Windows 的老工程师一样，安全地拯救你的 C 盘。
-> An agent skill that diagnoses, safely cleans, and migrates a full Windows C: drive — then proves the result with a before/after report.
+你只需要对 Agent 说一句“C 盘快满了”或“帮我清理电脑空间”，它就会分析 Windows 系统盘，生成一份本地可打开的可视化报告，并把需要你决定的项目一次列清楚。
 
-对你的 Agent（Codex / Claude Code）说一句：
+报告会说明 C 盘空间被什么占用：哪些是系统和软件缓存，哪些是临时文件，哪些是下载、聊天、浏览器或开发工具数据，哪些目录最大，哪些适合优先处理。每一项都会给出具体路径、实测大小、风险等级、处理建议，以及删除或迁移后可能带来的影响。
 
-```text
-C 盘快满了
-```
+它不是普通的“无脑清理工具”。
 
-它就会跑完一条完整的流水线：
+很多清理软件只会告诉你“发现 12GB 垃圾文件”，却不解释这些文件是什么，也不说明删除后是否会影响登录状态、软件修复、聊天记录、项目文件或系统更新。C Drive Savior 的核心是让 Agent 先把空间占用讲明白，再通过受限制、可确认、可追溯的脚本完成操作。
 
 ```text
-① 只读扫描 → 磁盘占用面板     看清 C 盘被什么吃掉（含普通扫描看不到的隐藏占用）
-② 一轮确认                    所有需要拍板的项目一次列全，你只回答一次
-③ 安全清理                    可重建缓存分级清理，管理员项走 UAC 提权
-④ 迁移到 D 盘                 复制→校验→切换路径→留撤销方案，绝不裸移
-⑤ 清理报告                    释放了多少 GB、每一项清了什么、哪些失败为什么
+只读扫描 -> 一轮确认 -> 会话绑定清理 -> 分阶段迁移 -> 实测报告
 ```
 
-## 为什么不用普通清理软件？
+## 这次更新带来了什么
 
-普通清理软件告诉你"发现 12GB 垃圾文件"，但不会告诉你：删完之后软件修复会不会失败、微信聊天记录还在不在、Windows 更新还能不能回滚。
+- **更清楚的空间面板**：PowerShell 和 Python 扫描器使用同一份分类规则与报告界面，按同级目录从大到小展示，并说明可见目录与磁盘已用空间的差额、拒绝访问和未完成扫描。
+- **更可靠的一次确认**：可重建缓存、需确认数据、禁止手删目录、可迁移项目，以及需要用户判断是否仍在使用的软件目录一次编号列出，不再逐轮追问。
+- **更严格的清理边界**：清理器只接受本次扫描发现、用户明确批准且存在于受限目录中的 `action_id`，不会把任意路径拼成删除命令。
+- **更稳妥的 D 盘迁移**：先 Stage 复制并核对文件清单、字节与 ACL；用户实际打开软件验证后，Finalize 会重新检查源目录并核对文件哈希，确认一致才允许删除源目录或建立 junction。
+- **更可信的结果报告**：清理前后使用同一个 Session ID，分别显示 C 盘净释放空间、各动作可归因空间、失败或部分完成项目和撤销信息。
+- **更诚实的异常处理**：遇到锁定文件、重解析点、权限拒绝或系统组件异常时会明确显示具体路径和状态，不把部分结果包装成“清理成功”。
 
-**C Drive Savior 的每一条规则都来自真实翻车现场**（完整清单见 [`references/pitfalls.md`](references/pitfalls.md)，24 条实证教训）：
+## 它解决什么
 
-- 有人清空了 `Package Cache`，两周后软件"修复"功能报错找不到安装包 → 所以它把安装缓存列为**黄灯确认项**，并优先建议备份到 D 盘而不是删除
-- 有人在组件存储损坏时跑了 `DISM /ResetBase`，94.9% 处报错、SFC 一起罢工 → 所以它在任何 WinSxS 清理前**强制先做健康检查**
-- 微信 4.0 把数据锁死在 C 盘 `Documents\xwechat_files`，还和旧版数据双份占用 → 所以它知道先用微信内置"清理历史版本冗余数据"，再靠"文档"文件夹重定向整体搬到 D 盘
-- `Remove-Item "C:\$WINDOWS.~BT"` 会静默删错路径（`$WINDOWS` 被当变量展开）→ 所以所有命令强制 `-LiteralPath` + 单引号
+- C 盘突然爆满，不知道空间被什么占用
+- 临时目录、浏览器和开发缓存持续增长
+- 下载、聊天文件、游戏库或项目数据需要迁到 D 盘
+- 清理软件给出一个总数，但不解释修复、登录、聊天记录或项目风险
+- 文件夹大小总和与磁盘已用空间对不上
 
-## 核心能力
+分析结果按四类展示：
 
-| 能力 | 说明 |
-|---|---|
-| **磁盘占用面板** | 同级目录从大到小、默认只看 >1GB；ASCII 面板 + 深色/浅色自适应 HTML 仪表盘 |
-| **隐藏占用透视** | pagefile / hiberfil / 系统还原点(VSS) / 回收站 / Windows Update 缓存 / WinSxS 真实大小——解释"文件夹加起来对不上已用空间"之谜 |
-| **四色风险分级** | 🟢可重建缓存 · 🟡需确认（修复缓存/回滚资产/聊天数据）· 🔴禁止手删 · 🔵适合迁移；只把"有决策"的项上灯，不做全盘点 |
-| **分层安全清理** | `clean.ps1` 默认干跑（只测量不删除）；逐项实测释放量；进程占用自动跳过；管理员项生成一条 UAC 提权命令 |
-| **D 盘迁移引擎** | `migrate.ps1`：空间预检×1.1 → robocopy → 文件数+字节双校验 → 可选 junction → 撤销命令写入日志；OneDrive/系统目录直接拒绝 |
-| **逐应用迁移手册** | 微信 4.0 / QQ / 钉钉 / WPS / Steam / Docker / WSL / npm·pip·gradle·nuget 缓存 / 页面文件 / iTunes 备份 / CompactOS（[`references/relocation-guide.md`](references/relocation-guide.md)） |
-| **清理报告** | `report.ps1`：磁盘级净释放 GB（主指标）+ 逐项实测 + 失败原因 + 撤销方式 + 保养建议，HTML 一眼看懂 |
+- `GREEN / 可放心清理`：已知、可重建的临时文件和缓存。关闭占用程序并确认后，可以交给受限清理器处理。
+- `YELLOW / 需要确认`：用户文件、安装修复缓存、聊天内容、离线数据或重建成本较高的内容。Agent 会解释后果，但不会自动删除。
+- `RED / 不建议动`：系统核心、程序安装目录、组件存储和活动数据库。只解释占用原因或引导使用官方工具，不提供危险的手删操作。
+- `MOVE / 建议迁移`：适合通过应用设置、Windows 已知文件夹重定向或验证迁移转移到 D 盘的数据。
+
+## 安全边界
+
+1. 默认只读，扫描完成前不执行破坏性动作。
+2. 所有清理和迁移动作都需要用户主动确认；用户资料、YELLOW 和 RED 项目不会进入一键清理。
+3. 决策写入不可变会话；后续清理、迁移和报告必须携带同一个 Session ID。
+4. 扫描行的路径哈希 `id` 用于迁移，目录 `action_id` 用于受限 GREEN 清理，避免把“看起来像缓存”直接变成删除命令。
+5. 清理器只接受共享目录中的动作，拒绝盘符根目录、越界路径、重解析点、受保护路径和未批准项目。
+6. 迁移分为 Stage 与 Finalize。Stage 复制并校验但保留源；用户验证应用后，Finalize 才能删除源或建立 junction。
+7. 报告区分磁盘净变化与动作可归因释放量，并显示失败、部分完成、拒绝访问和撤销信息。
+
+## 工作方式
+
+```mermaid
+flowchart LR
+    A[只读扫描] --> B[会话面板]
+    B --> C[一次编号确认]
+    C --> D[decide.ps1 固化决策]
+    D --> E[clean.ps1 目录动作]
+    D --> F[migrate.ps1 Stage]
+    F --> G[用户验证应用]
+    G --> H[migrate.ps1 Finalize]
+    E --> I[report.ps1 实测报告]
+    H --> I
+```
+
+PowerShell 与 Python 扫描器输出同一个 v2 契约，使用同一份分类目录和同一套 HTML 资源。扫描采用单次流式遍历，跳过 junction/symlink，并在 NTFS 文件身份可用时去重硬链接。隐藏系统占用单独呈现，避免与可见目录重复扣减。
 
 ## 快速开始
 
-**Codex：**
+安装到 Codex：
 
 ```powershell
 $skills = "$env:USERPROFILE\.codex\skills"
-New-Item -ItemType Directory -Force $skills
+New-Item -ItemType Directory -Force $skills | Out-Null
 git clone https://github.com/Choysang/C-Drive-Savior.git "$skills\c-drive-savior"
 ```
 
-**Claude Code：**
+安装到 Claude Code：
 
 ```powershell
 $skills = "$env:USERPROFILE\.claude\skills"
-New-Item -ItemType Directory -Force $skills
+New-Item -ItemType Directory -Force $skills | Out-Null
 git clone https://github.com/Choysang/C-Drive-Savior.git "$skills\c-drive-savior"
 ```
 
-重启 Agent，然后说：`C盘满了`、`帮我清理电脑空间`、`哪些东西可以移到D盘`、`看看C盘被什么吃掉了`。
+重启 Agent，然后说：`C盘满了`、`看看C盘`、`帮我安全释放空间`、`哪些文件可以移到D盘`。
 
-**不用 Agent 也能单独跑面板**（纯 PowerShell，无任何依赖，只读）：
+只运行只读面板：
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File .\scripts\scan.ps1 -ThresholdGB 1 -OpenReport
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\scan.ps1 -ThresholdGB 1 -OpenReport
 ```
+
+命令会打印 Session ID、`scan.json` 和 `panel.html` 的位置。完整的确认、执行和报告命令见 [SKILL.md](SKILL.md)。
+
+## 依赖
+
+运行时：
+
+- Windows 10/11 与 NTFS 系统盘
+- Windows PowerShell 5.1 或 PowerShell 7；主流程不需要第三方 PowerShell 模块
+- Python 仅用于可选扫描器，主流程不要求安装
+- HTML 面板为静态本地文件，不启动删除接口或本地 Web 服务
+
+开发与 CI：
+
+- Pester 5.6.1、Python `unittest`、`jsonschema` 与 PyYAML
+- Windows CI 覆盖 Python 3.9/3.13、PowerShell 7 和 Windows PowerShell 5.1
 
 ## 仓库结构
 
 ```text
-c-drive-savior/
-├── SKILL.md                        # Agent 编排：五阶段流水线 + 铁律
-├── scripts/
-│   ├── scan.ps1                    # 只读扫描 + 面板（控制台/JSON/HTML，含隐藏占用）
-│   ├── clean.ps1                   # 绿灯清理器：默认干跑，-Execute 才动手，逐项记账
-│   ├── migrate.ps1                 # D盘迁移：预检→复制→校验→junction→撤销日志
-│   ├── report.ps1                  # 清理报告：基线对比 + 动作明细 + 建议
-│   └── c_drive_panel.py            # Python 备选扫描器（大盘更快）
-├── references/
-│   ├── pitfalls.md                 # 24 条实证翻车教训（写任何命令前必读）
-│   ├── decision-model.md           # 四色分级目录 + 隐藏占用 + 执行顺序
-│   ├── relocation-guide.md         # 逐应用"搬去D盘"手册
-│   └── research-sources.md         # 微软官方文档与社区来源沉淀
-└── evals/evals.json                # 9 条行为评测（防翻车回归）
+assets/       共享静态报告模板与脚本
+config/       风险分类和 27 类受限清理动作
+modules/      会话、路径、目录解析和动作日志核心
+native/       NTFS 文件身份与分配大小读取
+scripts/      scan / decide / clean / migrate / report 与 Python 扫描器
+schemas/      session / scan / decisions / action v2 JSON Schema
+references/   风险判断、迁移手册、历史故障和证据来源
+tests/        PowerShell 5.1/7、Python、契约和跨扫描器测试
+benchmarks/   固定夹具与真实磁盘的可复现基准方法
+evals/        Skill 行为与安全门禁评测
 ```
 
-## 安全哲学
+## 性能声明
 
-1. **先看清，再动手**：不出面板不删除，所有破坏性动作过用户确认。
-2. **一次拍板**：需要你决定的事项一次列全编号清单，不挤牙膏式追问。
-3. **官方工具优先**：能走卸载器 / Storage Sense / Disk Cleanup / DISM / 应用内迁移的，绝不手删目录。
-4. **可撤销**：迁移默认保留源副本窗口期，撤销命令写进日志；用户数据只给可逆操作。
-5. **诚实记账**：释放空间逐项实测 + 磁盘级复核，失败项原样报告，绝不编数字。
+项目不预设哪个扫描器更快。基准必须在同一机器、同一目录树上顺序运行旧版与新版，保存原始耗时、峰值内存、文件数、拒绝路径和完成状态，再谈结论。方法见 [benchmarks/README.md](benchmarks/README.md)。安全与正确性改进不会伪装成速度提升。
 
-## 致谢
+## 真实教训
 
-- 分级决策清单、分段磁盘条、"现状→诊断→处方→操作→预防"报告结构的灵感来自 [khazix-skills/storage-analyzer](https://github.com/KKKKhazix/khazix-skills/tree/main/storage-analyzer)，本项目将其重构为 Windows 专用五阶段流水线。
-- 官方口径来自 Microsoft Learn / Support（WinSxS、Storage Sense、Dev Drive、已知文件夹重定向等），见 [`references/research-sources.md`](references/research-sources.md)。
+- 清空 `Package Cache` 后，软件修复功能可能找不到原安装包。
+- 组件存储损坏时运行 DISM 清理会继续失败，SFC 也可能无法执行。
+- 双引号中的 `C:\$WINDOWS.~BT` 会触发 PowerShell 变量展开，指向错误路径。
+- 只比文件数和总字节不能证明迁移内容一致；Finalize 还需要逐文件哈希和元数据复核。
+- `SilentlyContinue`、跨会话日志和短路径/重解析点都可能制造“看似成功”的假象。
 
-## License
+完整根因与处理规则见 [references/pitfalls.md](references/pitfalls.md)。
 
-MIT
+## 致谢与许可
 
----
+决策清单、分段空间条和“现状 -> 诊断 -> 处方 -> 操作 -> 预防”的报告结构受到 [storage-analyzer](https://github.com/KKKKhazix/khazix-skills/tree/main/storage-analyzer) 启发。本项目将其改造成 Windows 专用、会话绑定、默认无破坏性网页控制的工作流。官方与社区来源见 [references/research-sources.md](references/research-sources.md)。
 
-> 如果它帮你救回了几十 GB，点个 ⭐ 让更多 C 盘用户看到它。
+MIT License

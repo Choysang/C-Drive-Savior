@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>C Drive Savior / C盘拯救者</title>
+  <style>
+    :root{color-scheme:light;--bg:#f7f8fa;--surface:#fff;--ink:#20242b;--muted:#667085;--line:#d7dce3;--green:#18794e;--yellow:#946200;--red:#c4314b;--blue:#1769aa;--track:#e7eaf0}
+    @media(prefers-color-scheme:dark){:root{color-scheme:dark;--bg:#111317;--surface:#191c21;--ink:#edf0f4;--muted:#a4acb9;--line:#343942;--green:#45b97c;--yellow:#e0a72f;--red:#f06a7e;--blue:#66aee8;--track:#292e36}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;letter-spacing:0}
+    main{max-width:1180px;margin:0 auto;padding:22px}.mast{padding:8px 0 20px}.mast h1{font-size:24px;margin:0 0 4px}.sub{color:var(--muted)}
+    section{border-top:1px solid var(--line);padding:18px 0}h2{font-size:16px;margin:0 0 12px}h3{font-size:14px;margin:0 0 8px}
+    .metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:9px}.metric{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:11px 12px;min-width:0}
+    .metric .k{color:var(--muted);font-size:12px}.metric .v{font-size:22px;font-weight:650;overflow-wrap:anywhere}.metric .u{font-size:12px;color:var(--muted)}
+    .bar{height:13px;background:var(--track);display:flex;overflow:hidden;border-radius:4px;margin-top:12px}.bar span{display:block;height:100%}.used{background:var(--blue)}.freed{background:var(--green)}
+    .insight{border-left:3px solid var(--blue);padding:8px 11px;background:var(--surface)}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:18px}.grid2>div,.tier-grid>div{min-width:0}
+    .table-wrap{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}caption{text-align:left;color:var(--muted);padding:0 0 7px}
+    th,td{border-bottom:1px solid var(--line);padding:7px 8px;text-align:left;vertical-align:top}th{font-size:12px;color:var(--muted);font-weight:600}.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}code{font-size:12px;word-break:break-all}
+    .tier{font-weight:700}.GREEN{color:var(--green)}.YELLOW{color:var(--yellow)}.RED{color:var(--red)}.MOVE{color:var(--blue)}.failed,.partial,.skipped{color:var(--yellow)}.completed{color:var(--green)}
+    .tier-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}.empty{color:var(--muted);padding:8px 0}.maintenance{columns:2;column-gap:36px;margin:0;padding-left:20px}.maintenance li{margin:0 0 7px;break-inside:avoid}
+    @media(max-width:760px){main{padding:15px}.grid2,.tier-grid{grid-template-columns:1fr}.maintenance{columns:1}.metric .v{font-size:19px}}
+  </style>
+</head>
+<body>
+<main>
+  <header class="mast"><h1>C Drive Savior / C盘拯救者</h1><div class="sub" id="subtitle"></div></header>
+  <section><h2>磁盘状态</h2><div class="metrics" id="disk-metrics"></div><div class="bar" id="disk-bar" role="img" aria-label="磁盘已用与释放空间比例"></div></section>
+  <section><h2>判断</h2><div class="insight" id="insight"></div></section>
+  <section class="grid2"><div><h2>占用 Top 5</h2><div class="table-wrap" id="top-five"></div></div><div><h2>处理优先级</h2><div class="table-wrap" id="priority"></div></div></section>
+  <section><h2>风险分级</h2><div class="tier-grid" id="tier-sections"></div></section>
+  <section class="grid2"><div><h2>拒绝访问路径</h2><div class="table-wrap" id="denied"></div></div><div><h2>跳过的重解析点</h2><div class="table-wrap" id="reparse"></div></div></section>
+  <section><h2>动作结果</h2><div class="table-wrap" id="actions"></div></section>
+  <section><h2>维护建议</h2><ul class="maintenance" id="maintenance"></ul></section>
+</main>
+<script type="application/json" id="report-data">__REPORT_DATA__</script>
+<script>__REPORT_SCRIPT__</script>
+</body>
+</html>

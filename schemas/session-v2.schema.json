@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://choysang.github.io/C-Drive-Savior/schemas/session-v2.schema.json",
+  "title": "C Drive Savior session v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "state",
+    "created_at",
+    "updated_at",
+    "root",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "state": {
+      "enum": [
+        "scanned",
+        "awaiting-decision",
+        "approved",
+        "executing",
+        "reported",
+        "failed"
+      ]
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "updated_at": { "type": "string", "format": "date-time" },
+    "root": { "type": "string", "minLength": 1 },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scan", "decisions", "actions", "panel", "report"],
+      "properties": {
+        "scan": { "type": "string", "minLength": 1 },
+        "decisions": { "type": "string", "minLength": 1 },
+        "actions": { "type": "string", "minLength": 1 },
+        "panel": { "type": "string", "minLength": 1 },
+        "report": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

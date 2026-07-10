@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://choysang.github.io/C-Drive-Savior/schemas/action-v2.schema.json",
+  "title": "C Drive Savior action v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "tool",
+    "item_id",
+    "action",
+    "status",
+    "started_at",
+    "finished_at",
+    "before_bytes",
+    "after_bytes",
+    "freed_bytes",
+    "source",
+    "destination",
+    "error_code",
+    "error_message",
+    "undo"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "tool": { "enum": ["clean.ps1", "migrate.ps1"] },
+    "item_id": { "type": "string", "minLength": 1 },
+    "action": { "type": "string", "minLength": 1 },
+    "status": {
+      "enum": ["planned", "completed", "partial", "failed", "skipped", "not-found"]
+    },
+    "started_at": { "type": "string", "format": "date-time" },
+    "finished_at": { "type": ["string", "null"], "format": "date-time" },
+    "before_bytes": { "type": ["integer", "null"], "minimum": 0 },
+    "after_bytes": { "type": ["integer", "null"], "minimum": 0 },
+    "freed_bytes": { "type": ["integer", "null"], "minimum": 0 },
+    "source": { "type": ["string", "null"] },
+    "destination": { "type": ["string", "null"] },
+    "error_code": { "type": ["string", "null"] },
+    "error_message": { "type": ["string", "null"] },
+    "undo": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "steps"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "steps": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["action", "source", "destination", "path"],
+            "properties": {
+              "action": { "type": "string", "minLength": 1 },
+              "source": { "type": ["string", "null"] },
+              "destination": { "type": ["string", "null"] },
+              "path": { "type": ["string", "null"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

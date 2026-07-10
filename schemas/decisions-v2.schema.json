@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://choysang.github.io/C-Drive-Savior/schemas/decisions-v2.schema.json",
+  "title": "C Drive Savior decisions v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "approved_at",
+    "approved_clean_ids",
+    "approved_move_ids",
+    "protected_paths"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "approved_at": { "type": "string", "format": "date-time" },
+    "approved_clean_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "approved_move_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "protected_paths": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}
