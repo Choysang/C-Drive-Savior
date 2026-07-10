@@ -1,0 +1,41 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.9', '3.13']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Install Python development dependencies
+        run: python -m pip install -r requirements-dev.txt
+      - name: Install Pester for PowerShell 7
+        shell: pwsh
+        run: Install-Module Pester -RequiredVersion 5.6.1 -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Install Pester for Windows PowerShell 5.1
+        shell: powershell
+        run: Install-Module Pester -RequiredVersion 5.6.1 -Scope CurrentUser -Force -SkipPublisherCheck
+      - name: Run complete PowerShell 7 and Python suite
+        shell: pwsh
+        run: ./tests/run-all.ps1
+      - name: Run Windows PowerShell 5.1 suite
+        shell: powershell
+        run: |
+          $result = Invoke-Pester ./tests/powershell -Output Detailed -PassThru
+          if ($result.FailedCount -gt 0) { throw "$($result.FailedCount) test(s) failed." }
+      - name: Upload failed fixture reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fixture-reports-${{ matrix.python-version }}
+          path: tests/artifacts
+          if-no-files-found: ignore
