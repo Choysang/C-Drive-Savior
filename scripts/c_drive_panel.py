@@ -335,25 +335,23 @@ def normalize_for_contract(report: dict) -> dict:
 
 
 def render_html(report: dict) -> str:
-    rows = "".join(
-        "<tr>"
-        f"<td>{html.escape(row['tier'])}</td>"
-        f"<td>{row['unique_bytes'] / GB:.2f} GB</td>"
-        f"<td><code>{html.escape(row['path'])}</code></td>"
-        f"<td>{html.escape(row['note'])}</td>"
-        "</tr>"
-        for row in report["rows"]
+    payload = {
+        "view": "scan",
+        "session_id": report["session_id"],
+        "generated_at": report["generated_at"],
+        "scan": report,
+        "decisions": None,
+        "actions": [],
+        "summary": None,
+    }
+    template = (ROOT / "assets" / "report_template.html").read_text(encoding="utf-8")
+    shared_script = (ROOT / "assets" / "report_script.js").read_text(encoding="utf-8")
+    encoded = html.escape(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":")), quote=True
     )
-    drive = report["drives"][0]
-    return f"""<!doctype html><html lang="zh-CN"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>C Drive Savior</title>
-<style>body{{font:14px/1.5 "Segoe UI","Microsoft YaHei",sans-serif;margin:24px;color:#1f2328}}
-main{{max-width:1100px;margin:auto}}table{{width:100%;border-collapse:collapse}}th,td{{padding:8px;border-bottom:1px solid #d0d7de;text-align:left}}
-code{{word-break:break-all}}.summary{{display:flex;gap:24px;padding:14px 0}}</style></head><body><main>
-<h1>C Drive Savior / C盘拯救者</h1><div class="summary"><span>已用 {drive['used_bytes']/GB:.2f} GB</span>
-<span>可用 {drive['free_bytes']/GB:.2f} GB</span><span>候选 {len(report['rows'])}</span></div>
-<table><thead><tr><th>级别</th><th>大小</th><th>路径</th><th>建议</th></tr></thead><tbody>{rows}</tbody></table>
-</main></body></html>"""
+    return template.replace("__REPORT_DATA__", encoded).replace(
+        "__REPORT_SCRIPT__", shared_script
+    )
 
 
 def write_json_atomic(path: Path, value: dict) -> None:

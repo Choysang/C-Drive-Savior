@@ -38,4 +38,15 @@ Describe 'scan.ps1 v2 contract' {
     It 'does not subtract a hidden path twice' {
         $scan.accounting.duplicate_hidden_bytes | Should -Be 0
     }
+
+    It 'renders the shared static assets when HTML is enabled' {
+        $htmlSessions = Join-Path $TestDrive 'html-sessions'
+        & $ScanScript -ScanRoot $Fixture.Root -ThresholdGB 0 -MaxReportDepth 8 `
+            -SessionRoot $htmlSessions | Out-Null
+        $panel = Get-ChildItem -LiteralPath $htmlSessions -Filter panel.html -Recurse | Select-Object -First 1
+        $html = Get-Content -Raw -Encoding UTF8 -LiteralPath $panel.FullName
+        $sharedScript = Get-Content -Raw -Encoding UTF8 -LiteralPath "$PSScriptRoot\..\..\assets\report_script.js"
+        $html.Contains($sharedScript) | Should -BeTrue
+        $html | Should -Not -Match '__REPORT_DATA__|__REPORT_SCRIPT__'
+    }
 }

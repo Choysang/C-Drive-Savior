@@ -179,7 +179,20 @@ $report = [pscustomobject][ordered]@{
 Write-CdsJsonAtomic -Path $session.artifacts.scan -InputObject $report
 $session = Set-CdsSessionState -Session $session -NextState 'awaiting-decision'
 Write-CdsJsonAtomic -Path (Join-Path $session.root 'session.json') -InputObject $session
+if (-not $NoHtml) {
+    $payload = [pscustomobject][ordered]@{
+        view='scan'; session_id=$session.session_id; generated_at=$report.generated_at
+        scan=$report; decisions=$null; actions=@(); summary=$null
+    }
+    $template = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $skillRoot 'assets\report_template.html')
+    $sharedScript = Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $skillRoot 'assets\report_script.js')
+    $encoded = [Net.WebUtility]::HtmlEncode(($payload | ConvertTo-Json -Depth 100 -Compress))
+    $panel = $template.Replace('__REPORT_DATA__',$encoded).Replace('__REPORT_SCRIPT__',$sharedScript)
+    [IO.File]::WriteAllText($session.artifacts.panel,$panel,(New-Object Text.UTF8Encoding $false))
+}
 
 Write-Host ("Session: {0}" -f $session.session_id)
 Write-Host ("Scan: {0}" -f $session.artifacts.scan)
+if (-not $NoHtml) { Write-Host ("Panel: {0}" -f $session.artifacts.panel) }
 Write-Host ("Visible unique: {0:N2} GB; complete={1}; elapsed={2:N2}s" -f ($visibleUnique / 1GB), $scanComplete, $timer.Elapsed.TotalSeconds)
+if ($OpenReport -and -not $NoHtml) { Start-Process $session.artifacts.panel }

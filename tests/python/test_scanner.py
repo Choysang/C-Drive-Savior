@@ -49,6 +49,14 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(report["source_engine"], "python")
         self.assertIsInstance(report["drives"][0]["free_bytes"], int)
 
+    def test_render_uses_the_shared_static_assets(self) -> None:
+        report = scanner.scan_root(self.root, threshold=1, max_report_depth=8)
+        rendered = scanner.render_html(report)
+        shared_script = (scanner.ROOT / "assets" / "report_script.js").read_text(encoding="utf-8")
+        self.assertIn(shared_script, rendered)
+        self.assertNotIn("__REPORT_DATA__", rendered)
+        self.assertNotIn("__REPORT_SCRIPT__", rendered)
+
 
 if __name__ == "__main__":
     unittest.main()
