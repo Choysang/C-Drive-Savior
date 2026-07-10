@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://choysang.github.io/C-Drive-Savior/schemas/scan-v2.schema.json",
+  "title": "C Drive Savior scan v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "session_id",
+    "generated_at",
+    "source_engine",
+    "engine_version",
+    "scan_complete",
+    "scan_seconds",
+    "drives",
+    "rows",
+    "hidden",
+    "denied_paths",
+    "skipped_reparse_points",
+    "accounting",
+    "system_and_other_bytes"
+  ],
+  "properties": {
+    "schema_version": { "const": 2 },
+    "session_id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{7,127}$"
+    },
+    "generated_at": { "type": "string", "format": "date-time" },
+    "source_engine": { "enum": ["powershell", "python"] },
+    "engine_version": { "type": "string", "minLength": 1 },
+    "scan_complete": { "type": "boolean" },
+    "scan_seconds": { "type": "number", "minimum": 0 },
+    "drives": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/drive" }
+    },
+    "rows": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/row" }
+    },
+    "hidden": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/hidden" }
+    },
+    "denied_paths": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/denied_path" }
+    },
+    "skipped_reparse_points": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/reparse_point" }
+    },
+    "accounting": { "$ref": "#/$defs/accounting" },
+    "system_and_other_bytes": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "drive": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["letter", "filesystem", "total_bytes", "used_bytes", "free_bytes"],
+      "properties": {
+        "letter": { "type": "string", "pattern": "^[A-Za-z]:$" },
+        "filesystem": { "type": ["string", "null"] },
+        "total_bytes": { "type": "integer", "minimum": 0 },
+        "used_bytes": { "type": "integer", "minimum": 0 },
+        "free_bytes": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "row": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "parent_id",
+        "path",
+        "depth",
+        "logical_bytes",
+        "unique_bytes",
+        "exclusive_bytes",
+        "size_accuracy",
+        "tier",
+        "note"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "parent_id": { "type": ["string", "null"] },
+        "path": { "type": "string", "minLength": 1 },
+        "depth": { "type": "integer", "minimum": 0 },
+        "logical_bytes": { "type": "integer", "minimum": 0 },
+        "unique_bytes": { "type": "integer", "minimum": 0 },
+        "exclusive_bytes": { "type": "integer", "minimum": 0 },
+        "size_accuracy": {
+          "enum": ["allocated", "file-id-deduplicated", "logical"]
+        },
+        "tier": { "enum": ["GREEN", "YELLOW", "RED", "MOVE"] },
+        "note": { "type": "string" }
+      }
+    },
+    "hidden": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "label",
+        "bytes",
+        "size_accuracy",
+        "requires_admin",
+        "overlaps_visible_scan",
+        "note",
+        "error"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string", "minLength": 1 },
+        "bytes": { "type": ["integer", "null"], "minimum": 0 },
+        "size_accuracy": {
+          "enum": ["allocated", "file-id-deduplicated", "logical"]
+        },
+        "requires_admin": { "type": "boolean" },
+        "overlaps_visible_scan": { "type": "boolean" },
+        "note": { "type": "string" },
+        "error": { "type": ["string", "null"] }
+      }
+    },
+    "denied_path": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "error_code", "error_message"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "error_code": { "type": ["string", "null"] },
+        "error_message": { "type": "string" }
+      }
+    },
+    "reparse_point": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "kind", "target"],
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "kind": { "type": ["string", "null"] },
+        "target": { "type": ["string", "null"] }
+      }
+    },
+    "accounting": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "visible_unique_bytes",
+        "hidden_unique_bytes",
+        "duplicate_hidden_bytes",
+        "reconciliation_is_estimate"
+      ],
+      "properties": {
+        "visible_unique_bytes": { "type": "integer", "minimum": 0 },
+        "hidden_unique_bytes": { "type": "integer", "minimum": 0 },
+        "duplicate_hidden_bytes": { "type": "integer", "minimum": 0 },
+        "reconciliation_is_estimate": { "type": "boolean" }
+      }
+    }
+  }
+}
