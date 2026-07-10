@@ -37,7 +37,7 @@ if (-not (Get-Command Invoke-CdsRobocopy -ErrorAction SilentlyContinue)) {
             [Parameter(Mandatory)][string]$SourcePath,
             [Parameter(Mandatory)][string]$Destination
         )
-        & robocopy $SourcePath $Destination /E /COPY:DATS /DCOPY:DAT /R:1 /W:1 /XJ /MT:8 /NFL /NDL /NP | Out-Null
+        & robocopy $SourcePath $Destination /E /COPY:DAT /DCOPY:DAT /R:1 /W:1 /XJ /MT:8 /NFL /NDL /NP | Out-Null
         return [int]$LASTEXITCODE
     }
 }
@@ -54,6 +54,32 @@ function Get-CdsStreams([string]$Path) {
             ForEach-Object { $_.Stream } | Sort-Object -Unique)
     }
     return @()
+}
+
+function Get-CdsAclFingerprint([string]$Path) {
+    $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop
+    $rules = @($acl.Access | ForEach-Object {
+        '{0}|{1}|{2}|{3}|{4}' -f $_.IdentityReference,$_.AccessControlType,$_.FileSystemRights,$_.InheritanceFlags,$_.PropagationFlags
+    } | Sort-Object)
+    return ([pscustomobject][ordered]@{ owner=[string]$acl.Owner; group=[string]$acl.Group; rules=$rules } | ConvertTo-Json -Depth 5 -Compress)
+}
+
+function Sync-CdsAclTree([string]$SourceRoot, [string]$DestinationRoot, $Manifest) {
+    $pairs = New-Object System.Collections.Generic.List[object]
+    $pairs.Add([pscustomobject]@{ Source=$SourceRoot; Destination=$DestinationRoot; Depth=0 })
+    foreach ($entry in @($Manifest)) {
+        $relative = [string]$entry.relative_path
+        $pairs.Add([pscustomobject]@{
+            Source=(Join-Path $SourceRoot $relative)
+            Destination=(Join-Path $DestinationRoot $relative)
+            Depth=$relative.Split('\').Count
+        })
+    }
+    foreach ($pair in @($pairs | Sort-Object Depth)) {
+        $acl = Get-Acl -LiteralPath $pair.Source -ErrorAction Stop
+        $acl.SetAccessRuleProtection($true,$true)
+        Set-Acl -LiteralPath $pair.Destination -AclObject $acl -ErrorAction Stop
+    }
 }
 
 function Get-CdsManifest([string]$Root, [switch]$IncludeHash) {
@@ -80,7 +106,6 @@ function Get-CdsManifest([string]$Root, [switch]$IncludeHash) {
             if ($IncludeHash -and -not $isDirectory) {
                 $hash = (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
             }
-            $acl = Get-Acl -LiteralPath $path
             $entries.Add([pscustomobject][ordered]@{
                 relative_path=Get-RelativePath -Root $Root -Path $path
                 kind=if($isDirectory){'directory'}else{'file'}
@@ -88,7 +113,7 @@ function Get-CdsManifest([string]$Root, [switch]$IncludeHash) {
                 last_write_utc=$item.LastWriteTimeUtc.ToString('o')
                 attributes=[int]$attributes
                 streams=@(Get-CdsStreams $path)
-                acl_sddl=[string]$acl.Sddl
+                acl_sddl=Get-CdsAclFingerprint $path
                 sha256=$hash
             })
         }
@@ -236,6 +261,7 @@ try {
             }
         }
         $sourceManifest = @(Get-CdsManifest -Root $sourcePath)
+        $sourceRootAcl = Get-CdsAclFingerprint $sourcePath
         [long]$sourceBytes = ($sourceManifest | Where-Object kind -eq 'file' | Measure-Object length -Sum).Sum
         [long]$sourceAllocatedBytes = Get-CdsAllocatedBytes -Root $sourcePath -Manifest $sourceManifest
         if ($destVolume.FreeBytes -lt [long][math]::Ceiling($sourceAllocatedBytes * 1.1)) {
@@ -246,6 +272,11 @@ try {
         if ($copyCode -lt 0 -or $copyCode -ge 8) {
             Write-AndThrowMigration $action 'copy-failed' "Robocopy failed with exit code $copyCode." $sourceBytes $sourceBytes
         }
+        try { Sync-CdsAclTree -SourceRoot $sourcePath -DestinationRoot $destPath -Manifest $sourceManifest }
+        catch { Write-AndThrowMigration $action 'acl-copy-failed' ("ACL copy failed: " + $_.Exception.Message) $sourceBytes $sourceBytes }
+        if ((Get-CdsAclFingerprint $destPath) -cne $sourceRootAcl) {
+            Write-AndThrowMigration $action 'acl-mismatch' 'Destination root ACL does not match the source effective ACL.' $sourceBytes $sourceBytes
+        }
         $destManifest = @(Get-CdsManifest -Root $destPath)
         if (-not (Test-CdsManifestEqual $sourceManifest $destManifest)) {
             $difference = Get-CdsManifestDifference $sourceManifest $destManifest
@@ -254,7 +285,8 @@ try {
         $staged = [pscustomobject][ordered]@{
             schema_version=2; session_id=$SessionId; item_id=$itemId
             source=$sourcePath; destination=$destPath; staged_at=(Get-Date).ToUniversalTime().ToString('o')
-            robocopy_exit_code=[int]$copyCode; source_allocated_bytes=$sourceAllocatedBytes; source_manifest=$sourceManifest
+            robocopy_exit_code=[int]$copyCode; source_allocated_bytes=$sourceAllocatedBytes
+            source_root_acl=$sourceRootAcl; source_manifest=$sourceManifest
         }
         Write-CdsJsonAtomic -Path $manifestPath -InputObject $staged
         $undo = [pscustomobject][ordered]@{
@@ -282,6 +314,12 @@ try {
     if (-not (Test-CdsManifestEqual $staged.source_manifest $sourceManifest)) {
         $difference = Get-CdsManifestDifference $staged.source_manifest $sourceManifest
         Write-AndThrowMigration $action 'source-changed' "Source changed after staging: $difference" $sourceBytes $sourceBytes
+    }
+    if ((Get-CdsAclFingerprint $sourcePath) -cne [string]$staged.source_root_acl) {
+        Write-AndThrowMigration $action 'source-changed' 'Source root ACL changed after staging.' $sourceBytes $sourceBytes
+    }
+    if ((Get-CdsAclFingerprint $destPath) -cne [string]$staged.source_root_acl) {
+        Write-AndThrowMigration $action 'acl-mismatch' 'Destination root ACL changed after staging.' $sourceBytes $sourceBytes
     }
     if (-not (Test-CdsManifestEqual $staged.source_manifest $destManifest)) {
         $difference = Get-CdsManifestDifference $staged.source_manifest $destManifest

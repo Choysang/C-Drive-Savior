@@ -25,7 +25,7 @@ Use the migration script only after the scan decision has approved the MOVE item
   -Junction -SessionId '<session-id>' -SessionRoot '<session-root>'
 ```
 
-Stage records relative paths, lengths, UTC timestamps, attributes, alternate stream names, and ACL SDDL. Finalize rebuilds both manifests. Before source deletion it also hashes every source and destination file; large trees can therefore take about as long as reading the full dataset twice. Keep the same Session ID/root in both calls and require an explicit user report that the owning application passed its read/write smoke test before Finalize.
+Stage records relative paths, lengths, UTC timestamps, attributes, alternate stream names, and effective ACL fingerprints. Data is copied without robocopy's privileged security flag; the script then applies source ACLs as the destination owner and verifies equivalent owner/group/access rules, including the destination root. Finalize rebuilds both manifests. Before source deletion it also hashes every source and destination file; large trees can therefore take about as long as reading the full dataset twice. Keep the same Session ID/root in both calls and require an explicit user report that the owning application passed its read/write smoke test before Finalize.
 
 Migration is blocked for EFS-encrypted, sparse, or reparse-point content because an ordinary copy may not preserve those semantics. Stage also refuses OneDrive-managed paths, system/install areas, overlapping source/destination paths, non-fixed targets, and insufficient destination space.
 

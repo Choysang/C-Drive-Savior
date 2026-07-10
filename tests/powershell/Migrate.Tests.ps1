@@ -19,6 +19,12 @@ public static class CdsTestNative {
 }
 
 Describe 'migrate.ps1 staged migration' {
+    It 'does not require robocopy security privileges for the data copy' {
+        $sourceText = Get-Content -Raw -Encoding UTF8 -LiteralPath $Migrate
+        $sourceText | Should -Match '/COPY:DAT(\s|$)'
+        $sourceText | Should -Not -Match '/COPY:DATS'
+    }
+
     BeforeEach {
         $Root = Join-Path $TestDrive ([guid]::NewGuid().ToString('N'))
         $Source = Join-Path $Root 'source'
