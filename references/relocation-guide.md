@@ -11,21 +11,21 @@ Use the migration script only after the scan decision has approved the MOVE item
 ```powershell
 # 1. Copy to the fixed non-system volume. The source remains untouched.
 .\scripts\migrate.ps1 -Stage -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -SessionId '<session-id>'
+  -SessionId '<session-id>' -SessionRoot '<session-root>'
 
 # 2. Close and reopen the owning application. Exercise its normal read/write workflow.
 #    Do not finalize until this smoke test succeeds.
 
 # 3a. Remove the source only after fresh metadata and SHA-256 verification.
 .\scripts\migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -DeleteSource -SessionId '<session-id>'
+  -DeleteSource -SessionId '<session-id>' -SessionRoot '<session-root>'
 
 # 3b. Or replace the source with a validated junction when the application cannot change paths.
 .\scripts\migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -Junction -SessionId '<session-id>'
+  -Junction -SessionId '<session-id>' -SessionRoot '<session-root>'
 ```
 
-Stage records relative paths, lengths, UTC timestamps, attributes, alternate stream names, and ACL SDDL. Finalize rebuilds both manifests. Before source deletion it also hashes every source and destination file; large trees can therefore take about as long as reading the full dataset twice.
+Stage records relative paths, lengths, UTC timestamps, attributes, alternate stream names, and ACL SDDL. Finalize rebuilds both manifests. Before source deletion it also hashes every source and destination file; large trees can therefore take about as long as reading the full dataset twice. Keep the same Session ID/root in both calls and require an explicit user report that the owning application passed its read/write smoke test before Finalize.
 
 Migration is blocked for EFS-encrypted, sparse, or reparse-point content because an ordinary copy may not preserve those semantics. Stage also refuses OneDrive-managed paths, system/install areas, overlapping source/destination paths, non-fixed targets, and insufficient destination space.
 

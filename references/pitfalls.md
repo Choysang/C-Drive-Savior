@@ -153,3 +153,39 @@ Before any move to D:: check `(Get-PSDrive D).Free` > source size × 1.1; confir
 - Capture `(Get-PSDrive C).Free` before and after every phase; per-item freed = size measured immediately before delete.
 - Freed space may differ from estimates (hardlinks, compression, in-use files). Report actuals, list failures with the exact error, never fabricate a success.
 - One cleanup session at a time — two agents deleting concurrently produce corrupt logs and races.
+
+## 25. Environment variables are untrusted path inputs
+
+Real edge cases: `%TEMP%` used an 8.3 short path while `%LOCALAPPDATA%` used a long path; app data was redirected to D:; a cache root crossed a junction. Comparing raw strings either rejects a valid target or approves the wrong tree.
+
+- Canonicalize before comparison and enforce a component-aware allowed root; never use string-prefix checks.
+- A catalog resolver that cannot be mapped safely is omitted from scan actions. The cleaner remains stricter and refuses it.
+- Changing `%TEMP%`, `%LOCALAPPDATA%`, `%USERPROFILE%`, `%SystemRoot%`, or `%ProgramData%` after approval must not move an action outside its scanned baseline.
+
+## 26. Source/destination nesting defeats migration
+
+Copying a source into its own descendant grows recursively; placing the source inside the destination can make cleanup erase both. Reject identical paths, either nesting direction, same-volume destinations, system volumes, non-fixed targets, and OneDrive on both sides before robocopy starts.
+
+## 27. File count plus byte total is weak verification
+
+Two trees can have the same file count and byte total while containing different bytes, paths, attributes, ACLs, streams, or timestamps. Stage records a strict manifest. Finalize rebuilds source and destination manifests and hashes every file immediately before any source deletion. A mismatch is failure, not a warning.
+
+## 28. `SilentlyContinue` creates false success
+
+Suppressing an access error and then measuring an empty result turns “could not inspect” into “nothing to clean.” Runtime scripts use terminating errors at safety boundaries, explicit partial/failed statuses, and `finally` blocks for service restoration. Only expected discovery misses may be skipped, and they must not be reported as completed actions.
+
+## 29. Hidden bytes must not be subtracted twice
+
+Root-level pagefile, hiberfil, swapfile, and memory dumps may already be included in a full-root visible total. Mark overlap explicitly. The accounting contract reports visible unique bytes, hidden unique bytes, and duplicate hidden bytes separately; the panel never adds an overlapping hidden file as new reclaimable space.
+
+## 30. Scanner contract drift breaks the workflow
+
+The Python and PowerShell implementations once classified similar paths but emitted incompatible names and IDs. Both now share `config/classification.json`, v2 JSON Schema, stable path IDs, nullable cleanup `action_id`, raw byte fields, and parity tests. Never add a field or tier to one scanner only.
+
+## 31. Cross-session logs corrupt reports and approvals
+
+Selecting the oldest scan plus every historical action log can credit another cleanup or authorize a stale path. Every artifact lives under one validated session root. `decide.ps1`, elevated cleanup, migration, and `report.ps1` must receive the same Session ID; malformed or foreign action lines appear as failures.
+
+## 32. PowerShell 5.1 differs in encoding and scalar behavior
+
+Windows PowerShell 5.1 reads no-BOM UTF-8 as the system code page unless `-Encoding UTF8` is explicit. It also lacks a reliable `.Count` on a scalar `PSCustomObject`. Shared HTML/JavaScript and JSON reads specify UTF-8, and query results are wrapped with `@(...)` before count checks. Run the complete Pester suite in both 5.1 and 7.
