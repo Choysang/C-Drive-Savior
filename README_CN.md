@@ -14,170 +14,11 @@
 
 <br/>
 
-[**English Version**](#-english) &nbsp;|&nbsp; [**中文说明文档**](#-简体中文)
+[**English Version**](README.md) &nbsp;|&nbsp; [**中文说明文档**](README_CN.md)
 
 </div>
 
 ---
-
-<a id="english"></a>
-## 🌐 English
-
-### 1. 🌟 The Paradigm Shift
-
-For decades, Windows system cleaners have been trapped in the pre-AI era. They blindly scan for `.tmp` files and recycle bins while remaining completely blind to the real disk hogs of modern workstations:
-- **Massive AI Runtimes & Agent Workspaces**: Multi-gigabyte caches and local sessions from Codex (`.codex`), Claude Desktop (`.claude`), WorkBuddy AI (`.workbuddy-ai`), Ollama model weights (`.ollama`), and HuggingFace Hub.
-- **Modern Developer Toolchains**: Caches from `uv`, `pip`, `npm`, `pnpm`, `playwright`, and `cargo` that repeatedly bloat the C: drive.
-- **Destructive Deletion Traps**: Traditional cleaners blindly purge installer caches like `C:\ProgramData\Package Cache`, breaking Windows Installer MSI repair chains (causing unfixable `0x80070005` errors).
-- **The Agent Collaboration Gap**: Traditional CLI tools dump tens of thousands of lines of raw text, causing catastrophic **Token Flooding** and context exhaustion when invoked by autonomous LLMs.
-
-**C-Drive-Savior 2026+** is a ground-up, clean-slate reimagining of system storage engineering:
-1. **Agent-Native First**: Built directly on the **Model Context Protocol (FastMCP 2026)**, offering high-signal, token-compressed tools (< 400 tokens) protected by an autonomous **Cognitive Guard**.
-2. **Zero Historical Baggage**: 100% pure modern Python 3.12+ Native architecture. Zero legacy PowerShell 5.1/7 scripts, zero .NET Framework dependencies, zero fragile C# compilation steps.
-3. **Transactional NTFS Junction Engine**: Directly invokes Windows kernel APIs via Python's built-in `_winapi.CreateJunction`. Safely relocates massive folders across physical disks with **zero Administrator elevation needed** and seamless 3-step atomic rollback.
-4. **Decoupled Zero-Build Cyberpunk Console**: A responsive, dark glassmorphism dashboard powered by **Native ESM Import Maps + Vue 3 + Tailwind CSS CDN**. Zero `node_modules`, zero build steps, instant startup.
-
----
-
-### 2. 🏗️ Master Architecture Blueprint
-
-```mermaid
-flowchart TD
-    subgraph SuperAgents["🤖 Super-Intelligent Autonomous Agents (2026+)"]
-        direction LR
-        A1["Claude Opus 5.5n / Fable 5.1"]
-        A2["GPT-6 / Codex Autonomous"]
-        A3["Gemini 3.8 / Antigravity Agents"]
-    end
-
-    subgraph PresentationLayer["🎨 Decoupled Presentation & Adapter Layer"]
-        MCP["FastMCP 2026 Server<br/>(Stdio JSON-RPC 2.0)"]
-        API["FastAPI 2.0 Backend<br/>(Async REST API)"]
-        CLI["Unified Modern CLI<br/>(python -m c_drive_savior)"]
-        UI["Cyberpunk Web Console<br/>(Zero-Build ESM Vue 3 + Tailwind)"]
-    end
-
-    subgraph DomainLayer["🛡️ Domain Models & Cognitive Guard"]
-        CG["Cognitive Guard<br/>(Token Compression & Cursor Pagination)"]
-        Models["Pydantic v2 Contract Models<br/>(ScanOverview, StorageNode, Plan)"]
-    end
-
-    subgraph CoreEngine["⚡ Core Execution Engine"]
-        Scanner["Concurrent Profiler<br/>(os.scandir + FindNextFileW C-Speed)"]
-        Cleaner["Precision Cleaner<br/>(Reparse-Point Loop Guards)"]
-        Relocator["Transactional Relocator<br/>(3-Step Atomic Swap & Instant Rollback)"]
-    end
-
-    subgraph NativeKernel["💻 Windows Native Kernel Drivers"]
-        Junc["_winapi.CreateJunction<br/>(NTFS Reparse Points, Standard User)"]
-        Shell["Shell32 SHSetKnownFolderPath<br/>(User Shell Folders Redirection)"]
-        Proc["Win32 Process Snapshot<br/>(Lock & Conflict Detection)"]
-    end
-
-    SuperAgents -->|Stdio JSON-RPC| MCP
-    SuperAgents -->|REST HTTP| API
-    UI -->|HTTP / JSON| API
-    CLI --> CoreEngine
-    MCP --> CG
-    API --> CG
-    CG --> Models
-    Models --> CoreEngine
-    CoreEngine --> NativeKernel
-```
-
----
-
-### 3. 🧠 2026 Knowledge Graph Asset Catalog
-
-C-Drive-Savior classifies disk items into four unequivocal risk tiers:
-- 🟢 **GREEN (Safe to Clean)**: Automatically regenerable caches and ephemeral compiler artifacts.
-- 🟡 **YELLOW (User & Software Configurations)**: Requires confirmation; never deleted blindly.
-- 🔴 **RED (Protected System Zones)**: Core OS files, `WinSxS`, `System32`, `Package Cache`. Strictly guarded against hand deletion.
-- 🟣 **MOVE (Junction & Redirection Candidates)**: High-value assets that should be relocated to secondary drives (`D:`) via NTFS Junctions or Shell32 Known Folder redirection.
-
-| Category | Typical Paths | Strategy | Target Impact |
-| :--- | :--- | :--- | :--- |
-| **AI Workspaces & Sessions** | `%USERPROFILE%\.codex`<br/>`%USERPROFILE%\.workbuddy-ai`<br/>`%USERPROFILE%\.claude` | `NTFS Junction` | Reclaims 5 - 20 GB; applications retain full functionality without altering configuration paths. |
-| **LLM Weights & Hubs** | `%USERPROFILE%\.ollama`<br/>`%USERPROFILE%\.cache\huggingface` | `NTFS Junction` | Moves massive model weights to secondary drive; zero user permission friction. |
-| **Modern Dev Environments** | `%APPDATA%\uv`<br/>`%LOCALAPPDATA%\uv`<br/>`%LOCALAPPDATA%\pip\cache` | `Junction / Clean` | Global Python runtimes relocated; rebuildable package wheel caches safely pruned. |
-| **User Known Folders** | `%USERPROFILE%\Documents`<br/>`%USERPROFILE%\Downloads` | `Shell32 Redirection` | Migrates tens of gigabytes of user data cleanly using Windows native API. |
-| **Protected Core Areas** | `C:\Windows\System32`<br/>`C:\Windows\WinSxS`<br/>`C:\ProgramData\Package Cache` | `STRICTLY GUARDED` | Refuses deletion attempts. Protects Windows Installer repairability. |
-
----
-
-### 4. 🤖 FastMCP 2026 Specifications for Autonomous Agents
-
-C-Drive-Savior embeds an official **FastMCP 2026** JSON-RPC 2.0 server. Autonomous AI Agents can manage system storage using 8 standardized, high-signal tools:
-
-| Tool Name | Parameters | Signal & Token Optimization |
-| :--- | :--- | :--- |
-| `get_c_drive_overview` | *None* | Generates an executive diagnostic card (< 400 tokens) detailing drive capacities, top consumers, and potential reclaimable gigabytes. |
-| `list_cleanup_candidates` | `cursor: int` | Cursor-paginated listing of GREEN cache nodes for safe cleanup. |
-| `list_migration_candidates` | `cursor: int` | Cursor-paginated listing of MOVE assets prime for NTFS Junction relocation. |
-| `plan_relocation` | `source: str, dest: str` | Dry-run migration analysis: checks target volume space, validates permissions, and detects running process conflicts. |
-| `execute_relocation` | `source: str, dest: str, owning_processes: list` | Executes the 3-step atomic relocation with instant rollback on any I/O failure. |
-| `clean_cache` | `target_path: str, owning_processes: list` | Safely prunes directory while enforcing reparse-point bypass guards. |
-| `redirect_known_folder` | `folder_name: str, new_path: str` | Dynamically updates Shell32 and registry paths for `Documents` or `Downloads`. |
-| `get_known_folders` | *None* | Returns real-time physical locations of Windows user known folders. |
-
-#### Agent Configuration (`claude_desktop_config.json` / Codex / Cursor):
-```json
-{
-  "mcpServers": {
-    "c-drive-savior": {
-      "command": "python",
-      "args": ["-m", "c_drive_savior", "mcp"],
-      "cwd": "C:\\path\\to\\C-Drive-Savior\\src"
-    }
-  }
-}
-```
-
----
-
-### 5. 🚀 Quick Start & CLI Reference
-
-#### Installation
-```bash
-git clone https://github.com/Choysang/C-Drive-Savior.git
-cd C-Drive-Savior
-pip install -r requirements.txt
-```
-
-#### Launch Cyberpunk Web Console
-```bash
-python -m c_drive_savior serve --port 8999
-```
-*Open [http://127.0.0.1:8999](http://127.0.0.1:8999) in any modern browser for live interactive management.*
-
-#### Command-Line Operations (CLI)
-```bash
-# 1. Full system drive diagnostic
-python -m c_drive_savior scan
-
-# 2. Machine-readable JSON output for scripting
-python -m c_drive_savior scan --json
-
-# 3. Precision cache pruning
-python -m c_drive_savior clean "%LOCALAPPDATA%\uv"
-
-# 4. Atomic NTFS Junction directory relocation to D:
-python -m c_drive_savior relocate "C:\Users\username\.codex" --dest "D:\MovedFromC\.codex"
-
-# 5. Redirect Windows Known Folders
-python -m c_drive_savior redirect Documents "D:\Documents"
-python -m c_drive_savior redirect Downloads "D:\Downloads"
-
-# 6. Start FastMCP Stdio server
-python -m c_drive_savior mcp
-```
-
----
-
-<br/><hr/><br/>
-
-<a id="简体中文"></a>
-## 🇨🇳 简体中文
 
 ### 1. 🌟 时代背景与第一性原理
 
@@ -276,6 +117,19 @@ C-Drive-Savior 建立了一套严密的多维资产分类模型：
 | `redirect_known_folder` | `folder_name: str, new_path: str` | 动态调用 Shell32 重定向用户“文档”或“下载”目录至次级驱动器。 |
 | `get_known_folders` | *无* | 查询当前系统所有已知文件夹的实际物理路径。 |
 
+#### Agent 客户端挂载配置 (`claude_desktop_config.json` / Codex / Cursor):
+```json
+{
+  "mcpServers": {
+    "c-drive-savior": {
+      "command": "python",
+      "args": ["-m", "c_drive_savior", "mcp"],
+      "cwd": "C:\\path\\to\\C-Drive-Savior\\src"
+    }
+  }
+}
+```
+
 ---
 
 ### 5. 🎨 零构建现代极客控制台 (Zero-Build ESM Console)
@@ -292,7 +146,32 @@ python -m c_drive_savior serve --port 8999
 
 ---
 
-### 6. 📊 真实优化实测战果 (Battle Results)
+### 6. 🚀 命令行操作指南 (CLI)
+
+```bash
+# 1. 全盘空间深度极速诊断
+python -m c_drive_savior scan
+
+# 2. 输出机器可读的结构化 JSON
+python -m c_drive_savior scan --json
+
+# 3. 安全清理指定缓存
+python -m c_drive_savior clean "%LOCALAPPDATA%\uv"
+
+# 4. 原子迁移大目录至 D 盘并建立 Junction 软链接
+python -m c_drive_savior relocate "C:\Users\username\.codex" --dest "D:\MovedFromC\.codex"
+
+# 5. 重定向用户 Known Folders (如文档/下载) 到 D 盘
+python -m c_drive_savior redirect Documents "D:\Documents"
+python -m c_drive_savior redirect Downloads "D:\Downloads"
+
+# 6. 启动 FastMCP Stdio 服务
+python -m c_drive_savior mcp
+```
+
+---
+
+### 7. 📊 真实优化实测战果 (Battle Results)
 
 在实际 Windows 11 开发环境下的实测表现：
 
@@ -313,7 +192,7 @@ C: 净释放空间:    +36.68 GB (可用空间增长近 8 倍)
 
 ---
 
-### 7. 🛡️ 安全底线与架构不变量 (Safety Invariants)
+### 8. 🛡️ 安全底线与架构不变量 (Safety Invariants)
 
 1. **绝对禁区零手删**：对 `WinSxS`、`System32`、`Package Cache` 等实施强制代码级拦截，彻底避免因盲目清理导致 Windows 系统修复链瘫痪。
 2. **重解析点穿透阻断**：在遍历和清理临时目录（如 `%TEMP%`）时，遇到任何 Junction 或 Symlink 坚决阻断递归深入，绝不误伤软链接指向的物理目标数据。
@@ -322,12 +201,11 @@ C: 净释放空间:    +36.68 GB (可用空间增长近 8 倍)
 
 ---
 
-### 8. 🧪 自动化测试套件
+### 9. 🧪 自动化测试套件
 
 项目拥有完整的单元与集成测试保护：
 
 ```bash
-# 运行全量测试套件
 python -m unittest discover -s tests -p "test_*.py"
 ```
 
