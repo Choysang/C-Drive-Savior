@@ -39,6 +39,22 @@ For decades, Windows system cleaners have been trapped in the pre-AI era. They b
 
 ---
 
+### 🧩 Dual-Form Paradigm: System Software & Agent Skill Combined
+
+C-Drive-Savior is deliberately designed with a **Dual-Form Architecture**:
+
+- **💻 As System Software**: A high-performance, standalone Windows storage subsystem with WinAPI kernel bindings, an asynchronous FastAPI REST server, a zero-build Web console, and unified CLI commands.
+- **🤖 As an Agent Skill**: A standardized, progressive-disclosure AI Agent Skill (featuring an actionable [`SKILL.md`](SKILL.md) runbook) ready for **OpenAI Codex, Claude Code, Google Antigravity, Cursor, and Roo Code**.
+
+#### One-Click Agent Skill Registration:
+```bash
+python install_skill.py
+```
+*Creates zero-copy NTFS Junctions from this repo directly into `~/.codex/skills`, `~/.claude/skills`, and `~/.gemini/antigravity/skills`. Once linked, any Agent automatically recognizes and triggers C-Drive-Savior when you mention "clean C drive" or "C盘满了"!*
+
+---
+
+
 ### 2. 🏗️ Master Architecture Blueprint
 
 ```mermaid
@@ -194,6 +210,24 @@ python -m c_drive_savior mcp
 4. **前后端完全分离的零构建控制台**：借助浏览器原生 **ESM Import Maps + Vue 3 + Tailwind CSS CDN**，无任何 `node_modules` 负担，无需打包编译，极速启动暗黑赛博朋克毛玻璃管理面板。
 
 ---
+
+### 🧩 双模一体形态：既是系统底层软件，也是 Agent Skill
+
+本项目采用了 **“双模一体 (Dual-Form Paradigm)”** 创新设计：
+
+- **💻 作为系统软件程序**：
+  它是一个完全独立的现代化 Windows 存储治理系统，包含高性能 WinAPI 内核驱动、并发测量扫描器、FastAPI 异步 Web 服务端、Zero-build 赛博朋克前端控制台与 FastMCP JSON-RPC 服务。无论人类开发者还是运维脚本，都能独立运行。
+- **🤖 作为 Agent Skill（智能体技能）**：
+  它同时是一套完整的**标准化 Agent Skill**（内置 [`SKILL.md`](SKILL.md) 技能规范），支持无缝接入 **OpenAI Codex、Claude Code、Google Antigravity、Cursor、Roo Code** 等各类智能体环境。
+
+#### 一键将 Skill 注册至各大 Agent 环境：
+```bash
+python install_skill.py
+```
+*该脚本通过无物理复制的 NTFS Junction，自动将当前技能挂载至 `~/.codex/skills`、`~/.claude/skills` 以及 `~/.gemini/antigravity/skills`。注册完成后，任何 Agent 在听到“C盘满了”、“帮我清理系统盘”时，均能秒级识别并自动触发该技能！*
+
+---
+
 
 ### 2. 🏛️ 系统顶层全景架构
 

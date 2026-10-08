@@ -36,6 +36,24 @@
 
 ---
 
+### 🧩 双模一体形态：既是系统底层软件，也是 Agent Skill
+
+本项目采用了 **“双模一体 (Dual-Form Paradigm)”** 创新设计：
+
+- **💻 作为系统软件程序**：
+  它是一个完全独立的现代化 Windows 存储治理系统，包含高性能 WinAPI 内核驱动、并发测量扫描器、FastAPI 异步 Web 服务端、Zero-build 赛博朋克前端控制台与 FastMCP JSON-RPC 服务。无论人类开发者还是运维脚本，都能独立运行。
+- **🤖 作为 Agent Skill（智能体技能）**：
+  它同时是一套完整的**标准化 Agent Skill**（内置 [`SKILL.md`](SKILL.md) 技能规范），支持无缝接入 **OpenAI Codex、Claude Code、Google Antigravity、Cursor、Roo Code** 等各类智能体环境。
+
+#### 一键将 Skill 注册至各大 Agent 环境：
+```bash
+python install_skill.py
+```
+*该脚本通过无物理复制的 NTFS Junction，自动将当前技能挂载至 `~/.codex/skills`、`~/.claude/skills` 以及 `~/.gemini/antigravity/skills`。注册完成后，任何 Agent 在听到“C盘满了”、“帮我清理系统盘”时，均能秒级识别并自动触发该技能！*
+
+---
+
+
 ### 2. 🏛️ 系统顶层全景架构
 
 ```mermaid

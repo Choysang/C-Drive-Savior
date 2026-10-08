@@ -6,3 +6,6 @@ c-drive-scan-*.json
 c-drive-panel-*.html
 *.log
 .worktrees/
+*.egg-info/
+build/
+dist/
