@@ -1,141 +1,189 @@
-# C Drive Savior / C盘拯救者
+# C-Drive-Savior 2026+ | C盘拯救者
 
-你只需要对 Agent 说一句“C 盘快满了”或“帮我清理电脑空间”，它就会分析 Windows 系统盘，生成一份本地可打开的可视化报告，并把需要你决定的项目一次列清楚。
+> **Next-Generation Agent-Native Windows Storage Subsystem & Real-Time Console**
+>
+> 专为 2026+ 超级智能体（Claude Opus/Fable, GPT-6, Gemini 3.8 等）与现代开发者设计的全自主 Windows C 盘优化引擎。彻底告别传统清理工具的黑盒与历史包袱，采用零构建前后端完全分离架构与原生 Windows 底层内核。
 
-报告会说明 C 盘空间被什么占用：哪些是系统和软件缓存，哪些是临时文件，哪些是下载、聊天、浏览器或开发工具数据，哪些目录最大，哪些适合优先处理。每一项都会给出具体路径、实测大小、风险等级、处理建议，以及删除或迁移后可能带来的影响。
+[![Python 3.12+](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![FastMCP 2026](https://img.shields.io/badge/FastMCP-Stdio%20JSON--RPC-purple.svg)](https://modelcontextprotocol.io/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-v2.0-009688.svg)](https://fastapi.tiangolo.com)
+[![Vue 3 ESM](https://img.shields.io/badge/Frontend-Zero--Build%20Vue3-4FC08D.svg)](https://vuejs.org/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-它不是普通的“无脑清理工具”。
+---
 
-很多清理软件只会告诉你“发现 12GB 垃圾文件”，却不解释这些文件是什么，也不说明删除后是否会影响登录状态、软件修复、聊天记录、项目文件或系统更新。C Drive Savior 的核心是让 Agent 先把空间占用讲明白，再通过受限制、可确认、可追溯的脚本完成操作。
+## 🌟 核心设计理念 (Architecture Philosophy)
 
-```text
-只读扫描 -> 一轮确认 -> 会话绑定清理 -> 分阶段迁移 -> 实测报告
-```
+在过去的系统维护中，传统清理工具存在三大根本痛点：
+1. **时代的断层**：传统软件只识别回收站与系统日志，对动辄数十 GB 的现代 **AI 本地模型、Agent 工作区（Codex, Claude Desktop, WorkBuddy）、现代包管理器环境（uv, pnpm, cargo）** 毫无所知。
+2. **缺乏原子性与不可逆破坏**：暴力强删导致快捷方式失效、软件无法修复（如损坏 `Package Cache`）；缺乏无缝迁移与原子回滚机制。
+3. **Agent 协作鸿沟**：缺乏面向自主智能体（Autonomous Agents）的标准交互协议，输出未经提炼的海量文本造成 Token 洪泛。
 
-## 这次更新带来了什么
-
-- **更清楚的空间面板**：PowerShell 和 Python 扫描器使用同一份分类规则与报告界面，按同级目录从大到小展示，并说明可见目录与磁盘已用空间的差额、拒绝访问和未完成扫描。
-- **更可靠的一次确认**：可重建缓存、需确认数据、禁止手删目录、可迁移项目，以及需要用户判断是否仍在使用的软件目录一次编号列出，不再逐轮追问。
-- **更严格的清理边界**：清理器只接受本次扫描发现、用户明确批准且存在于受限目录中的 `action_id`，不会把任意路径拼成删除命令。
-- **更稳妥的 D 盘迁移**：先 Stage 复制并核对文件清单、字节与 ACL；用户实际打开软件验证后，Finalize 会重新检查源目录并核对文件哈希，确认一致才允许删除源目录或建立 junction。
-- **更可信的结果报告**：清理前后使用同一个 Session ID，分别显示 C 盘净释放空间、各动作可归因空间、失败或部分完成项目和撤销信息。
-- **更诚实的异常处理**：遇到锁定文件、重解析点、权限拒绝或系统组件异常时会明确显示具体路径和状态，不把部分结果包装成“清理成功”。
-
-## 它解决什么
-
-- C 盘突然爆满，不知道空间被什么占用
-- 临时目录、浏览器和开发缓存持续增长
-- 下载、聊天文件、游戏库或项目数据需要迁到 D 盘
-- 清理软件给出一个总数，但不解释修复、登录、聊天记录或项目风险
-- 文件夹大小总和与磁盘已用空间对不上
-
-分析结果按四类展示：
-
-- `GREEN / 可放心清理`：已知、可重建的临时文件和缓存。关闭占用程序并确认后，可以交给受限清理器处理。
-- `YELLOW / 需要确认`：用户文件、安装修复缓存、聊天内容、离线数据或重建成本较高的内容。Agent 会解释后果，但不会自动删除。
-- `RED / 不建议动`：系统核心、程序安装目录、组件存储和活动数据库。只解释占用原因或引导使用官方工具，不提供危险的手删操作。
-- `MOVE / 建议迁移`：适合通过应用设置、Windows 已知文件夹重定向或验证迁移转移到 D 盘的数据。
-
-## 安全边界
-
-1. 默认只读，扫描完成前不执行破坏性动作。
-2. 所有清理和迁移动作都需要用户主动确认；用户资料、YELLOW 和 RED 项目不会进入一键清理。
-3. 决策写入不可变会话；后续清理、迁移和报告必须携带同一个 Session ID。
-4. 扫描行的路径哈希 `id` 用于迁移，目录 `action_id` 用于受限 GREEN 清理，避免把“看起来像缓存”直接变成删除命令。
-5. 清理器只接受共享目录中的动作，拒绝盘符根目录、越界路径、重解析点、受保护路径和未批准项目。
-6. 迁移分为 Stage 与 Finalize。Stage 复制并校验但保留源；用户验证应用后，Finalize 才能删除源或建立 junction。
-7. 报告区分磁盘净变化与动作可归因释放量，并显示失败、部分完成、拒绝访问和撤销信息。
-
-## 工作方式
-
-```mermaid
-flowchart LR
-    A[只读扫描] --> B[会话面板]
-    B --> C[一次编号确认]
-    C --> D[decide.ps1 固化决策]
-    D --> E[clean.ps1 目录动作]
-    D --> F[migrate.ps1 Stage]
-    F --> G[用户验证应用]
-    G --> H[migrate.ps1 Finalize]
-    E --> I[report.ps1 实测报告]
-    H --> I
-```
-
-PowerShell 与 Python 扫描器输出同一个 v2 契约，使用同一份分类目录和同一套 HTML 资源。扫描采用单次流式遍历，跳过 junction/symlink，并在 NTFS 文件身份可用时去重硬链接。隐藏系统占用单独呈现，避免与可见目录重复扣减。
-
-## 快速开始
-
-安装到 Codex：
-
-```powershell
-$skills = "$env:USERPROFILE\.codex\skills"
-New-Item -ItemType Directory -Force $skills | Out-Null
-git clone https://github.com/Choysang/C-Drive-Savior.git "$skills\c-drive-savior"
-```
-
-安装到 Claude Code：
-
-```powershell
-$skills = "$env:USERPROFILE\.claude\skills"
-New-Item -ItemType Directory -Force $skills | Out-Null
-git clone https://github.com/Choysang/C-Drive-Savior.git "$skills\c-drive-savior"
-```
-
-重启 Agent，然后说：`C盘满了`、`看看C盘`、`帮我安全释放空间`、`哪些文件可以移到D盘`。
-
-只运行只读面板：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\scan.ps1 -ThresholdGB 1 -OpenReport
-```
-
-命令会打印 Session ID、`scan.json` 和 `panel.html` 的位置。完整的确认、执行和报告命令见 [SKILL.md](SKILL.md)。
-
-## 依赖
-
-运行时：
-
-- Windows 10/11 与 NTFS 系统盘
-- Windows PowerShell 5.1 或 PowerShell 7；主流程不需要第三方 PowerShell 模块
-- Python 仅用于可选扫描器，主流程不要求安装
-- HTML 面板为静态本地文件，不启动删除接口或本地 Web 服务
-
-开发与 CI：
-
-- Pester 5.6.1、Python `unittest`、`jsonschema` 与 PyYAML
-- Windows CI 覆盖 Python 3.9/3.13、PowerShell 7 和 Windows PowerShell 5.1
-
-## 仓库结构
+**C-Drive-Savior 2026+** 针对上述问题进行了**彻底的无历史包袱重构**：
 
 ```text
-assets/       共享静态报告模板与脚本
-config/       风险分类和 27 类受限清理动作
-modules/      会话、路径、目录解析和动作日志核心
-native/       NTFS 文件身份与分配大小读取
-scripts/      scan / decide / clean / migrate / report 与 Python 扫描器
-schemas/      session / scan / decisions / action v2 JSON Schema
-references/   风险判断、迁移手册、历史故障和证据来源
-tests/        PowerShell 5.1/7、Python、契约和跨扫描器测试
-benchmarks/   固定夹具与真实磁盘的可复现基准方法
-evals/        Skill 行为与安全门禁评测
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                        Super-Intelligent Agents                        │
+ │           (Claude Fable 5.1 / GPT-6 / Opus 5.5n / Gemini 3.8)           │
+ └──────────────────────┬─────────────────────────┬───────────────────────┘
+                        │ FastMCP JSON-RPC        │ REST API
+                        ▼                         ▼
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                      C-Drive-Savior Presentation                       │
+ │  ┌───────────────────────────────┐   ┌───────────────────────────────┐ │
+ │  │ FastMCP 2026 Stdio Server     │   │ FastAPI 2.0 Web Console       │ │
+ │  │ (Cognitive Guard Token Safe)  │   │ (Zero-Build Vue3 ESM Tailwind)│ │
+ │  └───────────────┬───────────────┘   └───────────────┬───────────────┘ │
+ └──────────────────┼───────────────────────────────────┼─────────────────┘
+                    └─────────────────┬─────────────────┘
+                                      ▼
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                           Core Engine Core                             │
+ │  ┌───────────────────────┐ ┌───────────────────────┐ ┌───────────────┐ │
+ │  │ Concurrent Profiler   │ │ Precision Cleaner     │ │ Relocator     │ │
+ │  │ (os.scandir + Memory) │ │ (Reparse Safe)        │ │ (Atomic 3-Step│ │
+ │  └───────────────────────┘ └───────────────────────┘ └───────────────┘ │
+ └────────────────────────────────────┬───────────────────────────────────┘
+                                      ▼
+ ┌────────────────────────────────────────────────────────────────────────┐
+ │                      Native Windows Kernel Drivers                     │
+ │  • _winapi.CreateJunction (NTFS Reparse Points, No Admin Required)     │
+ │  • Shell32 SHSetKnownFolderPath (User Shell Folders Redirection)       │
+ │  • Win32 Process Snapshot Locking (Conflict Detection)                 │
+ └────────────────────────────────────────────────────────────────────────┘
 ```
 
-## 性能声明
+---
 
-项目不预设哪个扫描器更快。基准必须在同一机器、同一目录树上顺序运行旧版与新版，保存原始耗时、峰值内存、文件数、拒绝路径和完成状态，再谈结论。方法见 [benchmarks/README.md](benchmarks/README.md)。安全与正确性改进不会伪装成速度提升。
+## ⚡ 核心能力与黑科技 (Key Features)
 
-## 真实教训
+### 1. 🤖 FastMCP 2026 协议原生集成 (Agent-Native)
+内置完整的 Model Context Protocol (MCP) JSON-RPC 2.0 引擎。任何 AI Agent 可通过 Stdio 零延迟调用：
+- `get_c_drive_overview`: 获取经 **Cognitive Guard** 压缩的极高信噪比盘符与 Top 消费者摘要（< 400 Tokens）。
+- `list_cleanup_candidates`: 分页获取可安全清除的 GREEN 缓存目录。
+- `list_migration_candidates`: 分页获取适于无缝转移至 D 盘的重点资产。
+- `execute_relocation`: 原子迁移源目录至目标驱动器，并在原地建立 NTFS Junction。
+- `redirect_known_folder`: 动态调用 Shell32 重定向用户“文档”或“下载”目录。
 
-- 清空 `Package Cache` 后，软件修复功能可能找不到原安装包。
-- 组件存储损坏时运行 DISM 清理会继续失败，SFC 也可能无法执行。
-- 双引号中的 `C:\$WINDOWS.~BT` 会触发 PowerShell 变量展开，指向错误路径。
-- 只比文件数和总字节不能证明迁移内容一致；Finalize 还需要逐文件哈希和元数据复核。
-- `SilentlyContinue`、跨会话日志和短路径/重解析点都可能制造“看似成功”的假象。
+### 2. 🔗 原生 NTFS Junction 事务性迁移 (Transactional Relocation)
+- 告别可能破坏注册表路径的传统“拷贝后删除”。
+- 直接调用 Python 底层 C 扩展 `_winapi.CreateJunction`，在普通用户权限下即可建立底层文件系统硬分流。
+- **三步原子保护**：`源目录备份改名 -> 数据移动至目标盘 -> 建立原生 Junction -> 验证通过后释放源备份`。任何环节异常即刻秒级回滚。
 
-完整根因与处理规则见 [references/pitfalls.md](references/pitfalls.md)。
+### 3. 🛡️ 智能认知护栏 (Cognitive Guard)
+- 防止大型目录树扫描结果向大模型上下文窗口倾倒数十万 Tokens。
+- 基于游标的轻量级分页（Cursor-based Pagination）与多维结构化诊断卡片。
 
-## 致谢与许可
+### 4. 🎨 零构建现代极客控制台 (Zero-Build ESM Console)
+- **前后端完全分离**：无 `node_modules` 负担，无需 Vite/Webpack 构建。
+- 基于原生 ESM Import Maps + Vue 3 + Tailwind CSS CDN 打造的暗色赛博朋克毛玻璃（Glassmorphism）控制台。
+- 启动即用：实时盘符水位进度条、一键安全清理、一键目录迁移、Known Folders 状态一览。
 
-决策清单、分段空间条和“现状 -> 诊断 -> 处方 -> 操作 -> 预防”的报告结构受到 [storage-analyzer](https://github.com/KKKKhazix/khazix-skills/tree/main/storage-analyzer) 启发。本项目将其改造成 Windows 专用、会话绑定、默认无破坏性网页控制的工作流。官方与社区来源见 [references/research-sources.md](references/research-sources.md)。
+### 5. 🧠 2026 现代工作区与 AI 资产图谱 (Knowledge Catalog)
+精准分类治理现代计算机的关键大资产：
+- **AI 运行时与工作区**：`.codex` (会话与工程), `.workbuddy-ai`, `.claude` (桌面端), `.ollama` (本地权重), `OpenAI`, `HuggingFace Hub`
+- **现代工具链缓存**：`uv` (全局与缓存), `pip`, `npm`, `pnpm`, `playwright`
+- **中国特色生态治理**：微信/QQNT/证券行情数据安全识别
+- **绝对受保护禁区**：`WinSxS`, `System32`, `Package Cache` 严格保护，绝不误触
 
-MIT License
+---
+
+## 🚀 快速上手 (Quick Start)
+
+### 1. 环境准备
+仅需 Python 3.12+ 环境：
+```bash
+git clone https://github.com/Choysang/C-Drive-Savior.git
+cd C-Drive-Savior
+pip install -r requirements.txt
+```
+
+### 2. 启动可视化控制台 (Web Console)
+```bash
+python -m c_drive_savior serve --port 8999
+```
+浏览器访问 `http://127.0.0.1:8999`，即可进入极具极客感的可视化运维面板。
+
+### 3. 命令行极速运维 (CLI)
+```bash
+# 全盘极速诊断 (输出格式化诊断报告)
+python -m c_drive_savior scan
+
+# 输出机器可读 JSON
+python -m c_drive_savior scan --json
+
+# 一键安全清理指定缓存
+python -m c_drive_savior clean "%LOCALAPPDATA%\uv"
+
+# 原子迁移大目录至 D 盘并建立 Junction
+python -m c_drive_savior relocate "C:\Users\username\.codex" --dest "D:\MovedFromC\.codex"
+
+# 重定向用户 Known Folders (如文档/下载) 到 D 盘
+python -m c_drive_savior redirect Documents "D:\Documents"
+```
+
+### 4. 作为 Agent MCP 工具挂载 (Claude Desktop / Codex / Cursor)
+在你的 Agent 客户端配置文件（如 `claude_desktop_config.json`）中添加：
+```json
+{
+  "mcpServers": {
+    "c-drive-savior": {
+      "command": "python",
+      "args": ["-m", "c_drive_savior", "mcp"],
+      "cwd": "C:\\path\\to\\C-Drive-Savior"
+    }
+  }
+}
+```
+
+---
+
+## 📂 项目结构 (Project Directory Tree)
+
+```text
+C-Drive-Savior/
+├── src/
+│   └── c_drive_savior/
+│       ├── __init__.py
+│       ├── __main__.py               # python -m c_drive_savior 入口
+│       ├── core/
+│       │   ├── engine/               # 核心执行引擎
+│       │   │   ├── scanner.py        # 并发目录测量与盘符剖析器
+│       │   │   ├── relocator.py      # 事务性 Junction 迁移与回滚
+│       │   │   └── cleaner.py        # 具备重解析点保护的安全清理器
+│       │   ├── native/               # Windows 底层 API 绑定
+│       │   │   ├── junction.py       # 原生 _winapi Junction 生命周期
+│       │   │   ├── known_folders.py  # Shell32 已知文件夹重定向
+│       │   │   └── process_lock.py   # 运行期文件/进程冲突感知
+│       │   └── rules/
+│       │       └── catalog.py        # 2026 AI/Dev/系统资产图谱
+│       ├── domain/                   # 领域模型与协议
+│       │   ├── models.py             # Pydantic v2 强类型领域模型
+│       │   └── cognitive_guard.py    # Agent 上下文认知护栏与分页
+│       ├── server/                   # 通信与服务层
+│       │   ├── cli.py                # 统一命令行接口
+│       │   ├── api_server.py         # FastAPI 异步 REST 服务
+│       │   └── mcp_server.py         # FastMCP JSON-RPC Stdio 服务
+│       └── console/                  # 零构建现代 Web 前端
+│           ├── index.html            # Tailwind + Glassmorphism UI
+│           └── app.js                # 原生 ESM Vue 3 响应式客户端
+├── tests/                            # 自动化全量测试套件
+│   ├── test_modern_engine.py         # 核心引擎与认知护栏单测
+│   └── test_api_and_mcp.py           # REST API 与 MCP 服务契约测试
+├── pyproject.toml                    # PEP 621 标准项目构建配置
+├── requirements.txt                  # 运行时依赖
+└── SKILL.md                          # 面向 AI Agent 的标准化技能声明
+```
+
+---
+
+## 🛡️ 安全承诺与设计边界 (Safety Guarantees)
+
+1. **绝对不碰系统红线区**：严禁暴力清理 `Windows\System32`、`WinSxS` 和 `Package Cache`，保护 Windows Update 和 MSI 修复链的完整性。
+2. **重解析点穿透保护**：在遍历和清理 Temp 缓存时，遇到任何重解析点（Junction/Symlink）一律跳过，绝不递归删除所指向的目标数据。
+3. **软链接解绑安全**：解绑 Junction 链接时使用原生底层解绑操作，严防任何意外递归清空实际数据盘目录。
+
+---
+
+## 📄 License
+MIT License. Open for human engineers and autonomous AI agents alike.

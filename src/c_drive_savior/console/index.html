@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>C-Drive-Savior 2026 | Agent-Native Storage Console</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        dark: {
+                            bg: '#0a0d14',
+                            card: '#111622',
+                            border: '#1f293d',
+                            hover: '#182030'
+                        },
+                        cyber: {
+                            cyan: '#00f2fe',
+                            blue: '#4facfe',
+                            emerald: '#10b981',
+                            amber: '#f59e0b',
+                            rose: '#f43f5e',
+                            purple: '#a855f7'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: #0a0d14;
+            color: #e2e8f0;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .glass-panel {
+            background: rgba(17, 22, 34, 0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+        .glow-cyan {
+            box-shadow: 0 0 20px -3px rgba(0, 242, 254, 0.25);
+        }
+        .glow-emerald {
+            box-shadow: 0 0 20px -3px rgba(16, 185, 129, 0.25);
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #0a0d14;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #1f293d;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #334155;
+        }
+    </style>
+</head>
+<body class="min-h-screen antialiased flex flex-col selection:bg-cyan-500 selection:text-black">
+    <div id="app" class="flex-1 flex flex-col">
+        <!-- Top Navigation -->
+        <header class="border-b border-dark-border bg-dark-card/60 backdrop-blur-md sticky top-0 z-50 px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center font-bold text-black text-xl shadow-lg shadow-cyan-500/20">
+                    ⚡
+                </div>
+                <div>
+                    <div class="flex items-center space-x-2">
+                        <h1 class="text-lg font-bold text-white tracking-wide">C-Drive-Savior</h1>
+                        <span class="px-2 py-0.5 text-xs font-mono font-semibold bg-cyan-950/60 text-cyan-400 border border-cyan-800/60 rounded-full">v2.0.0 Agent-Native</span>
+                    </div>
+                    <p class="text-xs text-slate-400">NTFS Transactional Relocator & FastMCP Storage Subsystem</p>
+                </div>
+            </div>
+
+            <!-- Header Status Badges & Global Actions -->
+            <div class="flex items-center space-x-4">
+                <div class="hidden md:flex items-center space-x-2 text-xs font-mono">
+                    <span class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-emerald-950/40 text-emerald-400 border border-emerald-800/40">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                        <span>API :8999</span>
+                    </span>
+                    <span class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-purple-950/40 text-purple-400 border border-purple-800/40">
+                        <span>FastMCP: Stdio Ready</span>
+                    </span>
+                    <span class="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-blue-950/40 text-blue-400 border border-blue-800/40">
+                        <span>WinAPI Native</span>
+                    </span>
+                </div>
+
+                <button @click="triggerScan" :disabled="loading" class="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-black font-semibold text-sm rounded-lg shadow-md transition flex items-center space-x-2 disabled:opacity-50">
+                    <svg v-if="loading" class="animate-spin h-4 w-4 text-black" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                    </svg>
+                    <span>{{ loading ? '深度分析中...' : '重新扫描全盘' }}</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="flex-1 max-w-7xl w-full mx-auto p-6 space-y-6">
+            <!-- Drive Gauges Section -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- C: Drive -->
+                <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl font-black font-mono text-cyan-400">C:</span>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white">系统盘 (System Drive)</h3>
+                                <p class="text-xs text-slate-400 font-mono">{{ overview.c_drive?.fs || 'NTFS' }}</p>
+                            </div>
+                        </div>
+                        <span :class="driveBadgeClass(overview.c_drive?.used_percent)" class="px-2.5 py-1 rounded-full text-xs font-mono font-bold border">
+                            {{ overview.c_drive?.used_percent }}% 已用
+                        </span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-slate-800/80 rounded-full h-3 mb-4 overflow-hidden p-0.5">
+                        <div :style="{ width: (overview.c_drive?.used_percent || 0) + '%' }" :class="driveProgressClass(overview.c_drive?.used_percent)" class="h-full rounded-full transition-all duration-700 ease-out"></div>
+                    </div>
+
+                    <div class="flex justify-between items-end text-xs font-mono">
+                        <div>
+                            <span class="text-slate-400">可用空间:</span>
+                            <span class="text-emerald-400 font-bold text-base ml-1.5">{{ overview.c_drive?.free_gb }} GB</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-slate-400">已用:</span>
+                            <span class="text-slate-200 ml-1">{{ overview.c_drive?.used_gb }} GB</span>
+                            <span class="text-slate-500 mx-1">/</span>
+                            <span class="text-slate-400">{{ overview.c_drive?.total_gb }} GB</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- D: Drive -->
+                <div class="glass-panel rounded-2xl p-6 relative overflow-hidden">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl font-black font-mono text-purple-400">D:</span>
+                            <div>
+                                <h3 class="text-sm font-semibold text-white">目标扩展盘 (Target Relocation Drive)</h3>
+                                <p class="text-xs text-slate-400 font-mono">{{ overview.d_drive?.fs || 'NTFS' }}</p>
+                            </div>
+                        </div>
+                        <span class="px-2.5 py-1 rounded-full text-xs font-mono font-bold border bg-purple-950/40 text-purple-400 border-purple-800/40">
+                            {{ overview.d_drive?.used_percent }}% 已用
+                        </span>
+                    </div>
+
+                    <!-- Progress Bar -->
+                    <div class="w-full bg-slate-800/80 rounded-full h-3 mb-4 overflow-hidden p-0.5">
+                        <div :style="{ width: (overview.d_drive?.used_percent || 0) + '%' }" class="h-full rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 transition-all duration-700 ease-out"></div>
+                    </div>
+
+                    <div class="flex justify-between items-end text-xs font-mono">
+                        <div>
+                            <span class="text-slate-400">可用空间:</span>
+                            <span class="text-cyan-400 font-bold text-base ml-1.5">{{ overview.d_drive?.free_gb }} GB</span>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-slate-400">已用:</span>
+                            <span class="text-slate-200 ml-1">{{ overview.d_drive?.used_gb }} GB</span>
+                            <span class="text-slate-500 mx-1">/</span>
+                            <span class="text-slate-400">{{ overview.d_drive?.total_gb }} GB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation & Action Bar -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-dark-border pb-3">
+                <div class="flex space-x-2">
+                    <button @click="currentTab = 'assets'" :class="currentTab === 'assets' ? 'bg-slate-800 text-cyan-400 border-cyan-500/50' : 'text-slate-400 hover:text-white border-transparent'" class="px-4 py-2 rounded-xl text-sm font-medium border transition flex items-center space-x-2">
+                        <span>🎯 可优化大文件资产</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-xs bg-slate-700/60 font-mono">{{ scanItems.length }}</span>
+                    </button>
+                    <button @click="currentTab = 'known_folders'" :class="currentTab === 'known_folders' ? 'bg-slate-800 text-purple-400 border-purple-500/50' : 'text-slate-400 hover:text-white border-transparent'" class="px-4 py-2 rounded-xl text-sm font-medium border transition flex items-center space-x-2">
+                        <span>📁 系统已知文件夹 (Known Folders)</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-xs bg-slate-700/60 font-mono">{{ Object.keys(knownFolders).length }}</span>
+                    </button>
+                    <button @click="currentTab = 'logs'" :class="currentTab === 'logs' ? 'bg-slate-800 text-emerald-400 border-emerald-500/50' : 'text-slate-400 hover:text-white border-transparent'" class="px-4 py-2 rounded-xl text-sm font-medium border transition flex items-center space-x-2">
+                        <span>📜 实时事务审计日志</span>
+                        <span class="px-1.5 py-0.5 rounded-full text-xs bg-slate-700/60 font-mono">{{ logs.length }}</span>
+                    </button>
+                </div>
+
+                <!-- Batch Actions -->
+                <div class="flex items-center space-x-3" v-if="currentTab === 'assets'">
+                    <button @click="batchCleanGreen" class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 hover:bg-emerald-900/40 transition">
+                        ⚡ 一键清理由 safe_to_delete 缓存
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tab 1: Asset Matrix -->
+            <div v-if="currentTab === 'assets'" class="glass-panel rounded-2xl overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="border-b border-dark-border/80 bg-slate-900/40 text-xs font-mono text-slate-400 uppercase tracking-wider">
+                                <th class="p-4">资产名称 / 路径</th>
+                                <th class="p-4">分类</th>
+                                <th class="p-4">大小</th>
+                                <th class="p-4">状态</th>
+                                <th class="p-4">建议策略</th>
+                                <th class="p-4 text-right">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-dark-border/40 text-sm">
+                            <tr v-for="item in scanItems" :key="item.path" class="hover:bg-slate-800/30 transition">
+                                <td class="p-4">
+                                    <div class="font-semibold text-white flex items-center space-x-2">
+                                        <span>{{ item.name }}</span>
+                                        <span v-if="item.is_junction" class="px-2 py-0.5 text-xs font-mono rounded bg-blue-950/80 text-blue-300 border border-blue-800/50">Junction 已链接</span>
+                                    </div>
+                                    <div class="text-xs font-mono text-slate-400 truncate max-w-md mt-0.5" :title="item.path">
+                                        {{ item.path }}
+                                    </div>
+                                    <div v-if="item.owning_processes && item.owning_processes.length" class="text-xs text-amber-400 mt-1 flex items-center space-x-1">
+                                        <span>⚠️ 关联进程:</span>
+                                        <span class="font-mono">{{ item.owning_processes.join(', ') }}</span>
+                                    </div>
+                                </td>
+                                <td class="p-4">
+                                    <span class="px-2 py-1 text-xs font-mono rounded-md bg-slate-800 text-slate-300 border border-slate-700">
+                                        {{ item.category }}
+                                    </span>
+                                </td>
+                                <td class="p-4 font-mono font-bold" :class="item.size_gb > 2 ? 'text-amber-400' : 'text-slate-300'">
+                                    {{ item.size_gb }} GB
+                                </td>
+                                <td class="p-4">
+                                    <span v-if="item.is_junction" class="text-xs text-blue-400 flex items-center space-x-1 font-mono">
+                                        <span>🔗 已迁至 D 盘</span>
+                                    </span>
+                                    <span v-else class="text-xs text-slate-400 flex items-center space-x-1 font-mono">
+                                        <span>💾 C 盘物理占用</span>
+                                    </span>
+                                </td>
+                                <td class="p-4">
+                                    <span :class="strategyBadgeClass(item.recommended_action)" class="px-2.5 py-1 text-xs font-medium rounded-full border">
+                                        {{ item.recommended_action }}
+                                    </span>
+                                </td>
+                                <td class="p-4 text-right space-x-2">
+                                    <!-- Relocate action -->
+                                    <button 
+                                        v-if="!item.is_junction && item.recommended_action === 'relocate_with_junction'"
+                                        @click="relocateItem(item)" 
+                                        :disabled="processingPath === item.path"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-cyan-950/60 text-cyan-400 border border-cyan-800/60 hover:bg-cyan-900/40 transition disabled:opacity-50">
+                                        {{ processingPath === item.path ? '迁移中...' : '无缝移至 D 盘' }}
+                                    </button>
+                                    
+                                    <!-- Clean action -->
+                                    <button 
+                                        v-if="item.recommended_action === 'safe_to_delete'"
+                                        @click="cleanItem(item)"
+                                        :disabled="processingPath === item.path"
+                                        class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-emerald-950/60 text-emerald-400 border border-emerald-800/60 hover:bg-emerald-900/40 transition disabled:opacity-50">
+                                        {{ processingPath === item.path ? '清理中...' : '安全清理' }}
+                                    </button>
+
+                                    <!-- In-app recommendation hint -->
+                                    <span v-if="item.recommended_action === 'in_app_migration_only'" class="text-xs text-slate-500 italic">
+                                        建议在软件设置内迁移
+                                    </span>
+                                    <span v-if="item.recommended_action === 'do_not_move'" class="text-xs text-rose-500/80 italic">
+                                        系统受保区不可移
+                                    </span>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 2: Known Folders -->
+            <div v-if="currentTab === 'known_folders'" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div v-for="(path, folder) in knownFolders" :key="folder" class="glass-panel rounded-2xl p-6 flex flex-col justify-between">
+                    <div>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="font-bold text-white text-base">{{ folder }}</h4>
+                            <span :class="path.toLowerCase().startsWith('c:') ? 'bg-amber-950/40 text-amber-400 border-amber-800/40' : 'bg-emerald-950/40 text-emerald-400 border-emerald-800/40'" class="px-2 py-0.5 text-xs font-mono rounded-full border">
+                                {{ path.toLowerCase().startsWith('c:') ? '位于 C 盘' : '已定向到其他盘' }}
+                            </span>
+                        </div>
+                        <p class="text-xs font-mono text-slate-400 bg-slate-900/60 p-2.5 rounded-lg border border-dark-border break-all">
+                            {{ path }}
+                        </p>
+                    </div>
+
+                    <div class="mt-4 pt-4 border-t border-dark-border/60 flex items-center justify-between">
+                        <span class="text-xs text-slate-400">标准迁移目标: <span class="font-mono text-slate-200">D:\{{ folder }}</span></span>
+                        <button 
+                            v-if="path.toLowerCase().startsWith('c:')"
+                            @click="redirectFolder(folder, 'D:\\' + folder)"
+                            class="px-3.5 py-1.5 text-xs font-semibold rounded-lg bg-purple-950/60 text-purple-400 border border-purple-800/60 hover:bg-purple-900/40 transition">
+                            重定向到 D 盘
+                        </button>
+                        <span v-else class="text-xs text-emerald-400 font-mono">✓ 已重定向</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Logs -->
+            <div v-if="currentTab === 'logs'" class="glass-panel rounded-2xl p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="font-bold text-white text-sm">系统执行事务流 (Transaction Stream)</h3>
+                    <button @click="logs = []" class="text-xs text-slate-400 hover:text-white font-mono">清空日志</button>
+                </div>
+                <div class="bg-black/60 rounded-xl p-4 font-mono text-xs text-slate-300 h-96 overflow-y-auto space-y-2 border border-dark-border/80">
+                    <div v-if="logs.length === 0" class="text-slate-600 text-center py-12">
+                        暂无操作日志
+                    </div>
+                    <div v-for="(log, idx) in logs" :key="idx" class="flex space-x-3">
+                        <span class="text-slate-500">[{{ log.time }}]</span>
+                        <span :class="logTypeClass(log.type)">[{{ log.type.toUpperCase() }}]</span>
+                        <span class="flex-1">{{ log.message }}</span>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="border-t border-dark-border/60 py-4 px-6 text-center text-xs text-slate-500 font-mono">
+            C-Drive-Savior 2026 • Designed for Super-intelligent Agents (FastMCP / REST API / Native WinAPI)
+        </footer>
+    </div>
+
+    <!-- Vue 3 ESM Mount -->
+    <script type="module" src="./app.js"></script>
+</body>
+</html>

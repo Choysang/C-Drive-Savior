@@ -1,129 +1,75 @@
 ---
 name: c-drive-savior
-description: C Drive Savior / C盘拯救者. Windows C drive diagnosis, safe cleanup, move-to-D migration, and measured reporting. Use whenever the user says C盘满了, C盘快满了, 清理C盘, 电脑空间不足, 帮我清理电脑空间, C盘瘦身, 把文件移到D盘, analyze C drive, clean system drive, disk full, or asks what can be deleted or moved to D:. Scan first, collect one confirmation, execute only approved catalog actions in one guarded session, stage verified migrations, and report measured results.
+description: Next-Generation Agent-Native Windows Storage Engine (C-Drive-Savior 2026+). Full disk diagnosis, precision cache cleaning, transactional NTFS Junction relocation to D:, and Shell32 Known Folder redirection. Features native Model Context Protocol (FastMCP 2026) JSON-RPC server, FastAPI REST backend, and zero-build glassmorphism web console. Use whenever the user asks to clean C drive, free up disk space, migrate files to D:, inspect storage, or when autonomous agents need storage management tools.
 ---
 
-# C Drive Savior / C盘拯救者
+# C Drive Savior 2026+ | Agent-Native Storage Subsystem
 
-Use one guarded session through five phases: **Scan -> Confirm -> Clean -> Migrate -> Report**. Runtime scripts support Windows PowerShell 5.1 and PowerShell 7. Python is an optional alternative scanner, not a requirement.
+专为 2026+ 超级智能体（Claude Opus/Fable, GPT-6, Gemini 3.8 等）与现代系统设计的高性能 Windows C 盘优化引擎。采用 Python 3.12+ 原生 WinAPI 内核、FastMCP 2026 协议与零构建前后端完全分离架构。
 
-## Non-negotiable rules
+## 🎯 核心工作流程 (Core Workflow)
 
-1. Start read-only. Do not delete, move, uninstall, change registry values, stop services, or run servicing cleanup before showing the scan panel and receiving approval.
-2. Read `references/pitfalls.md` before generating any action. It records real failures involving `$` paths, Package Cache, DISM, reparse points, elevation, encoding, sessions, and verification.
-3. Run exactly one scanner for the operational session. Keep the printed Session ID and pass the same `-SessionId` and `-SessionRoot` through every later phase.
-4. Ask once. Present every GREEN action ID, YELLOW consequence, RED refusal, MOVE row ID/destination, protected path, and unused-app candidate in one numbered decision list.
-5. Use the bundled scripts for filesystem actions. Never construct direct deletion commands. YELLOW and RED rows are explanations or official-tool/manual workflows, not inputs to `clean.ps1`.
-6. Never claim a complete scan when `scan_complete` is false. Repeat every concrete denied path and skipped reparse point supplied by the scan or user; do not replace them with a generic warning.
-7. Report raw measured bytes. Keep disk-level net change separate from action-attributable released bytes; show failures and partial results.
+AI Agent 与开发者运维标准工作流：
 
-Set one root for the whole session:
-
-```powershell
-$sessionRoot = "$env:USERPROFILE\c-drive-savior\sessions"
+```text
+ 1. 深度诊断 (Scan)       ──► FastScanner 并发剖析 + Cognitive Guard 压缩摘要
+ 2. 决策与规划 (Plan)    ──► 区分 GREEN(安全缓存) / MOVE(可迁资产) / RED(系统禁区)
+ 3. 原子执行 (Execute)    ──► 原生 _winapi Junction 软链接搬迁 / Shell32 文件夹重定向
+ 4. 实时监控 (Console)   ──► FastAPI 异步后端 + 零构建 Vue 3 赛博朋克控制台
 ```
 
-## Phase 1: Scan and panel
+---
 
-Choose exactly one scanner.
+## 🛠️ CLI 极速运维指令 (CLI Reference)
 
-```powershell
-# Canonical, zero third-party runtime dependencies
-powershell -NoProfile -ExecutionPolicy Bypass -File scripts/scan.ps1 `
-  -ThresholdGB 1 -SessionRoot $sessionRoot -OpenReport
-
-# Optional alternative when Python is already installed
-python scripts/c_drive_panel.py --threshold-gb 1 --session-root "$sessionRoot" --open
-```
-
-Capture the printed Session ID. Read that session's `scan.json` and `panel.html`. Summarize the disk state, one-line insight, Top 5, cleanup rows with `action_id`, MOVE rows with `id`, hidden/system gap, denied paths, and whether the scan completed. Do not combine output from both scanners.
-
-## Phase 2: One-round decision
-
-Read `references/decision-model.md`, then present one numbered list:
-
-1. GREEN cleanup actions: `action_id`, path, measured bytes, rebuild effect, owning process, and whether admin is needed.
-2. YELLOW rows: exact consequence and recommendation to keep, use an official UI, back up, uninstall, or migrate.
-3. RED rows: explain why hand deletion is refused and name the supported tool or uninstaller.
-4. MOVE rows: row `id`, source, proposed fixed non-system destination, and migration method.
-5. Protected paths and software the user confirms they no longer need.
-
-After the user answers, record the entire immutable decision:
+在终端中直接运行标准模块命令：
 
 ```powershell
-& scripts/decide.ps1 -SessionId $sid -SessionRoot $sessionRoot `
-  -ApproveClean @('temp-user','npm') `
-  -ApproveMove @('<move-row-id>') `
-  -Protect @('C:\Users\name\Documents\keep')
+# 1. 极速全盘空间剖析与摘要报告
+python -m c_drive_savior scan
+
+# 2. 输出机器可读的结构化 JSON 数据
+python -m c_drive_savior scan --json
+
+# 3. 启动交互式 Web 控制台与 REST API (端口 8999)
+python -m c_drive_savior serve --port 8999
+
+# 4. 安全清理指定缓存目录
+python -m c_drive_savior clean "%LOCALAPPDATA%\uv"
+
+# 5. 事务性将大目录搬迁至 D 盘并在原位置建立无缝 NTFS Junction 软链接
+python -m c_drive_savior relocate "C:\Users\username\.codex" --dest "D:\MovedFromC\.codex"
+
+# 6. 重定向 Windows 已知文件夹 (Documents / Downloads) 到 D 盘
+python -m c_drive_savior redirect Documents "D:\Documents"
+python -m c_drive_savior redirect Downloads "D:\Downloads"
+
+# 7. 启动 FastMCP JSON-RPC Stdio 服务 (供 Agent 工具挂载)
+python -m c_drive_savior mcp
 ```
 
-Use only IDs present in that scan. If the answer changes later, create a new scan session; do not overwrite the existing decision.
+---
 
-If the user provides an existing Session ID plus explicit approved IDs, continue that session. Do not demand a rescan merely because the earlier scanner was Python. When the user states that `decide.ps1` already recorded those IDs, generate the same-session bundled clean/admin command and let the script validate the artifacts; do not demand screenshots or claim that `actions.jsonl` proves a decision.
+## 🤖 FastMCP 2026 Agent 工具契约 (MCP Tools)
 
-## Phase 3: Approved GREEN cleanup
+系统原生支持 Model Context Protocol (MCP)。Agent 可直接发现并调用下列高信噪比工具：
 
-Preview selected catalog items first:
+| 工具名称 (Tool Name) | 核心功能与信噪比设计 |
+| :--- | :--- |
+| `get_c_drive_overview` | 返回由 **Cognitive Guard** 压缩的盘符容量、Top 5 空间占用与可释放潜力的精炼摘要（< 400 Tokens）。 |
+| `list_cleanup_candidates` | 游标分页获取经知识库分类的 GREEN 可安全清理缓存目录。 |
+| `list_migration_candidates` | 游标分页获取适合迁往 D 盘的重点数据资产（AI 工具链、包管理器环境等）。 |
+| `plan_relocation` | Dry-run 预检目录搬迁：计算占用体积、校验跨盘符空间与进程冲突。 |
+| `execute_relocation` | 执行原子三步搬迁（备份重命名 -> 跨盘移动 -> 原生 Junction 创建），失败自动回滚。 |
+| `clean_cache` | 执行安全缓存清理（具备重解析点穿透保护与进程锁检查）。 |
+| `redirect_known_folder` | 动态调用 Shell32 原生重定向“文档”或“下载”目录至次级驱动器。 |
+| `get_known_folders` | 获取当前用户所有已知文件夹的实际目标路径。 |
 
-```powershell
-& scripts/clean.ps1 -Include @('temp-user','npm')
-```
+---
 
-Execute user-level items only after the decision exists:
+## 🔒 安全红线与认知护栏 (Safety Boundaries)
 
-```powershell
-& scripts/clean.ps1 -Execute -SessionId $sid -SessionRoot $sessionRoot `
-  -Include @('temp-user','npm')
-```
-
-For admin items, preserve the same session ID and root. Ask the user to run the equivalent bundled `clean.ps1` command in an administrator PowerShell, or use `Start-Process powershell -Verb RunAs` with those exact values. Never omit `-SessionId`; never replace the script with ad hoc `Remove-Item` commands. Read `actions.jsonl` afterward and report locked, skipped, partial, or service-restoration failures.
-
-If a user says “approve everything,” still state the invariant boundary: RED is refused, YELLOW never enters `clean.ps1`, GREEN uses only scanned `action_id`, and MOVE uses only scanned row `id` after destination confirmation.
-
-Windows servicing is outside routine GREEN cleanup. Only discuss `DISM /StartComponentCleanup` after the health gate in `pitfalls.md` #6 passes. Do not suggest `/ResetBase` as routine cleanup.
-
-## Phase 4: Verified migration
-
-Prefer application settings, official export/import, and Windows known-folder redirection. Use the generic mover only for an approved MOVE row and after reading `references/relocation-guide.md`.
-
-```powershell
-# Stage copies and verifies; source remains untouched
-& scripts/migrate.ps1 -Stage -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -SessionId $sid -SessionRoot $sessionRoot
-```
-
-Stop and ask the user to reopen the owning application and exercise normal read/write behavior. Do not Finalize until the user confirms that smoke test.
-
-```powershell
-# Choose one only after user verification
-& scripts/migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -DeleteSource -SessionId $sid -SessionRoot $sessionRoot
-
-& scripts/migrate.ps1 -Finalize -Source 'C:\path' -Dest 'D:\MovedFromC\path' `
-  -Junction -SessionId $sid -SessionRoot $sessionRoot
-```
-
-The script refuses OneDrive paths, system/install locations, overlapping targets, unsafe file semantics, removable/system destinations, insufficient space, manifest drift, and hash mismatches. Prefer `-DeleteSource`; use a junction only when an application cannot change its path and OneDrive is not involved.
-
-## Phase 5: Session report
-
-```powershell
-& scripts/report.ps1 -SessionId $sid -SessionRoot $sessionRoot -OpenReport
-```
-
-Lead with: disk-level net released bytes and C: free space before/after. Then show action-attributable bytes, the difference, top completed actions, partial/failed/skipped entries, undo information, denied scan paths, and maintenance advice. Never merge historical action logs or convert a malformed action into success.
-
-## Never do
-
-- Hand-delete `System32`, `SysWOW64`, `WinSxS`, `Windows\Installer`, `SystemApps`, `servicing`, `WindowsApps`, whole `Program Files`, `Common Files`, whole `ProgramData`, whole browser `User Data`, or whole `%LOCALAPPDATA%\Packages`.
-- Bulk-delete `Package Cache` or installer caches. Prefer named-app uninstall/reinstall or backup-to-D after explicit acceptance of repair loss.
-- Delete chat history, cloud sync roots, project data, Downloads, Desktop, or Documents without an item-specific decision.
-- Junction a OneDrive-managed path, drag-move an installed app, use registry cleaners, follow reparse points, or delete a migration source before fresh verification.
-
-## References
-
-- `references/pitfalls.md`: mandatory failure catalog before any action.
-- `references/decision-model.md`: tier meanings, action IDs, and one-round prompt structure.
-- `references/relocation-guide.md`: app-native moves and Stage/Finalize migration.
-- `references/research-sources.md`: evidence and source policy.
-- `benchmarks/README.md`: reproducible scanner benchmark method; do not invent performance claims.
+1. **绝对禁区 (RED Tiers)**：严禁手删 `C:\Windows\System32`、`C:\Windows\WinSxS` 与 `C:\ProgramData\Package Cache`。
+2. **重解析点穿透保护 (Reparse Point Guard)**：清理缓存（如 `%TEMP%`）时严格阻断重解析点遍历，绝不递归删除软链接指向的真实文件。
+3. **安全解绑 (Safe Unlink)**：解绑 NTFS Junction 时仅调用底层目录节点删除，严禁使用递归 `rmtree`。
+4. **认知护栏 (Cognitive Guard)**：全面过滤庞大冗余的深层目录树，通过 Cursor Pagination 与领域卡片防止上下文溢出。

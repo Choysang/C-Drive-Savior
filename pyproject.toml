@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "c-drive-savior"
+version = "2.0.0"
+description = "Agent-Native, Next-Generation Windows C: Drive Diagnostician, Relocator, and Precision Cleaner"
+readme = "README.md"
+authors = [
+    { name = "Choysang" },
+    { name = "Antigravity Autonomous Multi-Agent Core" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.11"
+dependencies = [
+    "pydantic>=2.0.0",
+    "fastapi>=0.110.0",
+    "uvicorn>=0.28.0",
+]
+
+[project.optional-dependencies]
+mcp = ["mcp>=1.0.0"]
+test = ["pytest>=8.0.0"]
+
+[project.scripts]
+c-drive-savior = "c_drive_savior.server.cli:main"
+savior = "c_drive_savior.server.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
